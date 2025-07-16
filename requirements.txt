@@ -1,0 +1,12 @@
+# 核心依赖
+pynput>=1.7.6
+typer[all]>=0.9.0
+rich>=13.0.0
+pydantic>=2.0.0
+PyYAML>=6.0
+
+# 开发和测试依赖 (可选)
+pytest>=7.0.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.0.0
