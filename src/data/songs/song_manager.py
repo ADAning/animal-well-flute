@@ -286,10 +286,21 @@ class SongManager:
         
         # 检查是否为字符串化格式（每小节一个字符串）
         if jianpu_data and isinstance(jianpu_data[0], str):
-            # 字符串化格式：每小节一个字符串
+            # 字符串化格式：每小节一个字符串或多小节用|分割
             for bar_str in jianpu_data:
-                parsed_bar = self._parse_bar_string(bar_str)
-                parsed_jianpu.append(parsed_bar)
+                # 检查是否包含|分割符
+                if '|' in bar_str:
+                    # 多小节用|分割
+                    sub_bars = bar_str.split('|')
+                    for sub_bar_str in sub_bars:
+                        sub_bar_str = sub_bar_str.strip()
+                        if sub_bar_str:  # 跳过空字符串
+                            parsed_bar = self._parse_bar_string(sub_bar_str)
+                            parsed_jianpu.append(parsed_bar)
+                else:
+                    # 单小节
+                    parsed_bar = self._parse_bar_string(bar_str)
+                    parsed_jianpu.append(parsed_bar)
         else:
             # 旧的嵌套列表格式
             for bar in jianpu_data:
@@ -704,9 +715,9 @@ class SongManager:
                 errors.append("Field 'bpm' must be a positive number")
         
         # 验证relative字段
-        if 'relative' in data:
-            if not isinstance(data['relative'], (int, float)):
-                errors.append("Field 'relative' must be a number")
+        if 'offset' in data:
+            if not isinstance(data['offset'], (int, float)):
+                errors.append("Field 'offset' must be a number")
         
         # 验证description字段
         if 'description' in data:
@@ -751,14 +762,31 @@ class SongManager:
                     errors.append(f"Bar {i+1} cannot be empty")
                     continue
                 
-                # 验证字符串格式
-                try:
-                    tokens = self._tokenize_bar_string(bar_str)
-                    for j, token in enumerate(tokens):
-                        if not self._is_valid_note_token(token):
-                            errors.append(f"Bar {i+1}, Note {j+1}: Invalid token '{token}'")
-                except Exception as e:
-                    errors.append(f"Bar {i+1}: Failed to parse - {e}")
+                # 验证字符串格式，支持|分割的多小节
+                if '|' in bar_str:
+                    # 多小节用|分割
+                    sub_bars = bar_str.split('|')
+                    for k, sub_bar_str in enumerate(sub_bars):
+                        sub_bar_str = sub_bar_str.strip()
+                        if not sub_bar_str:
+                            continue  # 跳过空的子小节
+                        
+                        try:
+                            tokens = self._tokenize_bar_string(sub_bar_str)
+                            for j, token in enumerate(tokens):
+                                if not self._is_valid_note_token(token):
+                                    errors.append(f"Bar {i+1}.{k+1}, Note {j+1}: Invalid token '{token}'")
+                        except Exception as e:
+                            errors.append(f"Bar {i+1}.{k+1}: Failed to parse - {e}")
+                else:
+                    # 单小节
+                    try:
+                        tokens = self._tokenize_bar_string(bar_str)
+                        for j, token in enumerate(tokens):
+                            if not self._is_valid_note_token(token):
+                                errors.append(f"Bar {i+1}, Note {j+1}: Invalid token '{token}'")
+                    except Exception as e:
+                        errors.append(f"Bar {i+1}: Failed to parse - {e}")
         else:
             # 传统格式验证
             for i, bar in enumerate(jianpu):
