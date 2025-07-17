@@ -66,7 +66,7 @@ class SongManager:
                     logger.debug(f"Detected legacy format in {file_path}")
                 else:
                     logger.warning(f"Unknown YAML format in {file_path}, attempting legacy parsing")
-                
+
                 song = Song(**data)
                 self.songs[song.name.lower().replace(" ", "_")] = song
                 external_count += 1
@@ -360,7 +360,7 @@ class SongManager:
         return notes
     
     def _tokenize_bar_string(self, bar_str: str) -> List[str]:
-        """将小节字符串分词
+        """将小节字符串分词 - 按空格分割，保持括号完整性
         
         Args:
             bar_str: 小节字符串
@@ -369,98 +369,115 @@ class SongManager:
             分词后的列表
         """
         tokens = []
-        i = 0
         current_token = ""
+        bracket_count = 0
+        i = 0
         
         while i < len(bar_str):
             char = bar_str[i]
             
             if char == '(':
-                # 处理括号内容
+                bracket_count += 1
+                current_token += char
+            elif char == ')':
+                bracket_count -= 1
+                current_token += char
+                
+                # 如果括号平衡了，检查是否需要继续收集字符
+                if bracket_count == 0:
+                    # 查看后面是否有逗号和其他字符
+                    j = i + 1
+                    while j < len(bar_str) and bar_str[j] in ',':
+                        current_token += bar_str[j]
+                        j += 1
+                    
+                    # 继续收集非空格字符
+                    while j < len(bar_str) and not bar_str[j].isspace():
+                        current_token += bar_str[j]
+                        j += 1
+                    
+                    # 更新索引
+                    i = j - 1
+                    
+            elif char.isspace() and bracket_count == 0:
+                # 只在括号外的空格处分割
                 if current_token.strip():
                     tokens.append(current_token.strip())
                     current_token = ""
-                
-                bracket_count = 1
-                paren_content = "("
-                i += 1
-                
-                while i < len(bar_str) and bracket_count > 0:
-                    if bar_str[i] == '(':
-                        bracket_count += 1
-                    elif bar_str[i] == ')':
-                        bracket_count -= 1
-                    paren_content += bar_str[i]
-                    i += 1
-                
-                tokens.append(paren_content)
-                
-            elif char.isspace():
-                # 空格分隔
-                if current_token.strip():
-                    tokens.append(current_token.strip())
-                    current_token = ""
-                i += 1
-                
             else:
                 current_token += char
-                i += 1
+            
+            i += 1
         
         # 处理最后的token
         if current_token.strip():
             tokens.append(current_token.strip())
         
-        return tokens
+        # 清理tokens，移除末尾的逗号
+        cleaned_tokens = []
+        for token in tokens:
+            if token.endswith(','):
+                token = token[:-1]
+            if token:  # 只添加非空的tokens
+                cleaned_tokens.append(token)
+        
+        return cleaned_tokens
     
     def _parse_note_token(self, token: str) -> Any:
-        """解析单个音符token
+        """递归解析单个音符token
         
         Args:
-            token: 音符token，如 "3" 或 "(3,4)" 或 "(3)" 或复杂嵌套
+            token: 音符token，如 "3" 或 "(3,4)" 或 "((3,4),5)" 等
             
         Returns:
             解析后的音符数据
         """
         token = token.strip()
+        if not token:
+            return ""
         
-        if token.startswith('(') and token.endswith(')'):
-            # 括号格式
-            inner = token[1:-1]  # 去掉括号
+        # 如果不是括号格式，直接返回基本类型
+        if not token.startswith('(') or not token.endswith(')'):
+            return self._parse_basic_token(token)
+        
+        # 括号格式：去掉外层括号
+        inner = token[1:-1]
+        if not inner:
+            return ()
+        
+        # 按逗号分割，但要考虑嵌套括号
+        parts = self._split_by_comma_smart(inner)
+        
+        # 递归解析每个部分
+        parsed_parts = []
+        for part in parts:
+            part = part.strip()
+            if part:  # 跳过空字符串
+                parsed_parts.append(self._parse_note_token(part))
+        
+        # 返回元组
+        return tuple(parsed_parts) if len(parsed_parts) > 1 else (parsed_parts[0],) if parsed_parts else ()
+    
+    def _parse_basic_token(self, token: str) -> Any:
+        """解析基本token（非括号格式）
+        
+        Args:
+            token: 基本token
             
-            if ',' in inner:
-                # 多元素元组 - 使用智能分割
-                parts = self._split_by_comma_smart(inner)
-                parsed_parts = []
-                for part in parts:
-                    part = part.strip()
-                    if part:  # 跳过空字符串
-                        # 递归解析每个部分
-                        parsed_parts.append(self._parse_note_token(part))
-                return tuple(parsed_parts)
+        Returns:
+            解析后的基本数据
+        """
+        token = token.strip()
+        
+        # 尝试解析为数字
+        try:
+            if '.' in token:
+                return float(token)
             else:
-                # 单元素元组
-                # 检查内容是否还是括号格式，需要递归解析
-                if inner.startswith('(') and inner.endswith(')'):
-                    return (self._parse_note_token(inner),)
-                else:
-                    try:
-                        # 支持浮点数（半音）
-                        if '.' in inner:
-                            return (float(inner),)
-                        else:
-                            return (int(inner),)
-                    except ValueError:
-                        return (inner,)
-        else:
-            # 简单格式
-            try:
-                # 支持浮点数（半音）
-                if '.' in token:
-                    return float(token)
-                else:
-                    return int(token)
-            except ValueError:
-                return token
+                return int(token)
+        except ValueError:
+            # 不是数字，返回字符串
+            return token
     
     def _detect_yaml_format(self, data: Dict) -> str:
         """检测YAML文件的格式类型
@@ -853,6 +870,55 @@ class SongManager:
         if not token:
             return False
         
+        # 递归验证token结构
+        return self._validate_token_structure(token)
+    
+    def _validate_token_structure(self, token: str) -> bool:
+        """递归验证token结构
+        
+        Args:
+            token: 要验证的token
+            
+        Returns:
+            是否有效
+        """
+        token = token.strip()
+        
+        # 如果不是括号格式，验证基本token
+        if not token.startswith('(') or not token.endswith(')'):
+            return self._is_valid_basic_token(token)
+        
+        # 验证括号平衡
+        if not self._is_balanced_parentheses(token):
+            return False
+        
+        # 去掉外层括号
+        inner = token[1:-1]
+        if not inner:
+            return True  # 空括号是有效的
+        
+        # 分割并递归验证每个部分
+        try:
+            parts = self._split_by_comma_smart(inner)
+            for part in parts:
+                part = part.strip()
+                if part and not self._validate_token_structure(part):
+                    return False
+            return True
+        except:
+            return False
+    
+    def _is_valid_basic_token(self, token: str) -> bool:
+        """验证基本token（非括号格式）
+        
+        Args:
+            token: 基本token
+            
+        Returns:
+            是否有效
+        """
+        token = token.strip()
+        
         # 简单音符：数字、浮点数、休止符、特殊标记
         if token.isdigit() or token in ['-', '0'] or any(c in token for c in ['h', 'l', 'd']):
             return True
@@ -864,63 +930,39 @@ class SongManager:
         except ValueError:
             pass
         
-        # 括号格式 - 支持嵌套
-        if token.startswith('(') and token.endswith(')'):
-            return self._is_valid_parentheses_content(token)
+        # 检查是否为有效的音符字符串格式
+        import re
+        valid_patterns = [
+            r'^[lh]?\d+(\.\d+)?d?$',  # 标准音符格式，如 l1, h2, 1.5d
+            r'^-+$',  # 延长音符号
+            r'^0+$',  # 休止符
+        ]
+        
+        for pattern in valid_patterns:
+            if re.match(pattern, token):
+                return True
         
         return False
     
-    def _is_valid_parentheses_content(self, token: str) -> bool:
-        """检查括号内容是否有效（支持嵌套）
+    def _is_balanced_parentheses(self, token: str) -> bool:
+        """检查括号是否平衡
         
         Args:
-            token: 带括号的token
+            token: 要检查的字符串
             
         Returns:
-            是否有效
+            括号是否平衡
         """
-        if not (token.startswith('(') and token.endswith(')')):
-            return False
-        
-        inner = token[1:-1]
-        if not inner:
-            return False
-        
-        # 尝试解析token来验证其有效性
-        try:
-            # 使用现有的分词和解析逻辑
-            if ',' in inner:
-                # 处理包含逗号的复杂结构
-                parts = self._split_by_comma_smart(inner)
-                for part in parts:
-                    part = part.strip()
-                    if not part:
-                        continue
-                    # 递归验证每个部分
-                    if part.startswith('(') and part.endswith(')'):
-                        if not self._is_valid_parentheses_content(part):
-                            return False
-                    elif not (part.isdigit() or part in ['-', '0'] or 
-                             any(c in part for c in ['h', 'l', 'd'])):
-                        # 检查是否为浮点数（半音）
-                        try:
-                            float(part)
-                        except ValueError:
-                            return False
-            else:
-                # 单个元素
-                if not (inner.isdigit() or inner in ['-', '0'] or 
-                       any(c in inner for c in ['h', 'l', 'd'])):
-                    # 检查是否为浮点数（半音）
-                    try:
-                        float(inner)
-                    except ValueError:
-                        return False
-            
-            return True
-        except:
-            # 如果解析失败，返回False
-            return False
+        count = 0
+        for char in token:
+            if char == '(':
+                count += 1
+            elif char == ')':
+                count -= 1
+                if count < 0:
+                    return False
+        return count == 0
+    
     
     def _split_by_comma_smart(self, text: str) -> List[str]:
         """智能按逗号分割，考虑括号嵌套

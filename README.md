@@ -1,20 +1,31 @@
-# Animal Well Flute
+<div align="center">
+  <img src="imgs/logo.png" alt="logo">
+</div>
 
 A command-line utility to convert Jianpu (numbered musical notation) into directional inputs for the flute in the game *Animal Well*. This tool allows players to easily translate their favorite melodies into playable in-game flute songs.
 
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <a href="https://www.python.org/">
+    <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python Version">
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+  </a>
+</p>
 
 ---
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Features](#features)
+  - [Coming Soon](#coming-soon)
 - [How It Works](#how-it-works)
 - [Installation](#installation)
 - [Usage](#usage)
   - [List Available Songs](#list-available-songs)
   - [Play a Song](#play-a-song)
+    - [Advanced: Choosing a Conversion Strategy](#advanced-choosing-a-conversion-strategy)
   - [Convert a Song File](#convert-a-song-file)
 - [Song File Format](#song-file-format)
 - [Project Structure](#project-structure)
@@ -32,6 +43,7 @@ A command-line utility to convert Jianpu (numbered musical notation) into direct
 
 - [ ] **Jianpu Auto Importer**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format. Typically, only minor modifications are needed to make the song playable.
 - [ ] **Expanded Song Library**: More pre-converted songs will be added to the library. Community contributions for new songs are highly encouraged!
+- [ ] **GUI Support**: A simple interactive interface that allows users to select songs and set parameters.
 
 ## How It Works
 
@@ -90,10 +102,10 @@ python cli.py play <song_name> --strategy <strategy_name> [parameter]
 
 **Available Strategies:**
 
-- **`optimal` (Default):** Automatically calculates the best pitch shift (transposition) to fit the maximum number of notes into the flute's range.
-- **`high`**: Prefers to transpose the song to a higher pitch.
-- **`low`**: Prefers to transpose the song to a lower pitch.
 - **`auto [high|low|optimal]`**: Automatically selects the best strategy among `high`, `low`, and `optimal`. You can provide an optional preference (e.g., `auto high`).
+  - **`optimal` (Default):** Automatically calculates the best pitch shift (transposition) to fit the maximum number of notes into the flute's range.
+  - **`high`**: Prefers to transpose the song to a higher pitch.
+  - **`low`**: Prefers to transpose the song to a lower pitch.
 - **`manual <offset / song>`**: Manually specify a pitch shift in semitones. The `<offset>` can be a positive or negative number (e.g., `1.5`, `-2.0`). Or specify the offset in the song.
 - **`none`**: Applies no transposition (`manual 0.0`).
 
@@ -149,19 +161,15 @@ The `jianpu` format uses numbers `1-7` to represent notes. Special characters an
 **Example (`songs/a_dream.yaml`):**
 
 ```yaml
-name: A Dream
-bpm: 100
+name: Travelers
+bpm: 90
+offset: 0.0
 jianpu:
-  - 0 0 (0,3) (3,4)
-  - 5 (3) 5d (0,5)
-  - 5 (3,2) 2 (1,1)
-  - (h1,7) (6,7) (6,5) (5,3)
-  - (6,5) (3,5) 0 (0,5)
-  - (5,4) (3,4) 4 (0,4)
-  - (3,2) (2,1) 1 (l6,1)
-  - (2,2) (2,3) (2,3) (2,l6) 2 0
-offset: 0.5
-description: 梦一场
+- 1 5 7 (0,5) | (h1,7) (6,5) (6,7) 5 | 
+- 2 5 7 (0,5) | (h1,7) (6,5) (6,7) (h2,7) |
+- 3 5 7 (0,5) | (h1,7) (6,5) (6,7) 5 |
+- 2 5 7 (0,5) | (h1,7) (6,5) (6,7) (h2,7) |
+description: "Outer Wilds (Travelers' encore)"
 ```
 
 ## Project Structure

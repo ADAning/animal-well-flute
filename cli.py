@@ -172,7 +172,7 @@ def list_songs():
     song_manager = SongManager(songs_dir=Path("songs"))
     
     print("📋 可用乐曲:")
-    for song_key in song_manager.list_songs():
+    for song_key in sorted(song_manager.list_songs()):
         try:
             song = song_manager.get_song(song_key)
             print(f"   {song_key:20s} - {song.name} (BPM: {song.bpm})")
@@ -181,7 +181,7 @@ def list_songs():
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='Animal Well 自动相对音高系统')
+    parser = argparse.ArgumentParser(description='Animal Well 笛子自动演奏')
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
     
     # play 命令

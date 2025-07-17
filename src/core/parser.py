@@ -63,6 +63,13 @@ class RelativeParser:
                         return
                 else:
                     note_str = elem.replace("d", "")
+                    # 特殊处理延长音符号
+                    if note_str == "-":
+                        # 延长音，将时值加到前一个音符
+                        if result:
+                            result[-1].time_factor += note_time_factor
+                            logger.debug(f"Extended previous note by {note_time_factor}")
+                        return
             else:
                 raise ValueError(f"Unsupported note type: {type(elem)}")
             
