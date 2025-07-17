@@ -45,7 +45,7 @@ The flute in *Animal Well* is played using 8 directions on a controller, corresp
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/animal-well-flute.git
+    git clone https://github.com/ADAning/animal-well-flute.git
     cd animal-well-flute
     ```
 
