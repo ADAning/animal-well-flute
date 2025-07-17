@@ -176,9 +176,14 @@ class SongManager:
         
         # 处理简单字符串（没有逗号和括号）
         if ',' not in note_str and '(' not in note_str:
-            # 尝试转换为数字，否则保持字符串
+            # 尝试转换为数字（支持浮点数），否则保持字符串
             try:
-                return int(note_str)
+                # 先尝试整数
+                if '.' not in note_str:
+                    return int(note_str)
+                else:
+                    # 支持浮点数（半音）
+                    return float(note_str)
             except ValueError:
                 return note_str
         
@@ -186,12 +191,16 @@ class SongManager:
         if '(' in note_str:
             return self._parse_nested_expression(note_str)
         
-        # 处理简单的逗号分隔（如 "6,3"）
+        # 处理简单的逗号分隔（如 "6,3" 或 "1.5,2.5"）
         parts = [part.strip() for part in note_str.split(',')]
         parsed_parts = []
         for part in parts:
             try:
-                parsed_parts.append(int(part))
+                # 支持浮点数（半音）
+                if '.' in part:
+                    parsed_parts.append(float(part))
+                else:
+                    parsed_parts.append(int(part))
             except ValueError:
                 parsed_parts.append(part)
         
@@ -212,7 +221,11 @@ class SongManager:
             if ',' not in inner:
                 # 单元素元组
                 try:
-                    return (int(inner),)
+                    # 支持浮点数（半音）
+                    if '.' in inner:
+                        return (float(inner),)
+                    else:
+                        return (int(inner),)
                 except ValueError:
                     return (inner,)
         
@@ -246,7 +259,12 @@ class SongManager:
                 else:
                     # 单元素括号内容
                     try:
-                        result.append(int(inner_expr.strip()))
+                        # 支持浮点数（半音）
+                        inner_stripped = inner_expr.strip()
+                        if '.' in inner_stripped:
+                            result.append(float(inner_stripped))
+                        else:
+                            result.append(int(inner_stripped))
                     except ValueError:
                         result.append(inner_expr.strip())
             
@@ -254,7 +272,12 @@ class SongManager:
                 # 处理当前积累的token
                 if current_token.strip():
                     try:
-                        result.append(int(current_token.strip()))
+                        # 支持浮点数（半音）
+                        token_stripped = current_token.strip()
+                        if '.' in token_stripped:
+                            result.append(float(token_stripped))
+                        else:
+                            result.append(int(token_stripped))
                     except ValueError:
                         result.append(current_token.strip())
                     current_token = ""
@@ -267,7 +290,12 @@ class SongManager:
         # 处理最后的token
         if current_token.strip():
             try:
-                result.append(int(current_token.strip()))
+                # 支持浮点数（半音）
+                token_stripped = current_token.strip()
+                if '.' in token_stripped:
+                    result.append(float(token_stripped))
+                else:
+                    result.append(int(token_stripped))
             except ValueError:
                 result.append(current_token.strip())
         
@@ -416,13 +444,21 @@ class SongManager:
                     return (self._parse_note_token(inner),)
                 else:
                     try:
-                        return (int(inner),)
+                        # 支持浮点数（半音）
+                        if '.' in inner:
+                            return (float(inner),)
+                        else:
+                            return (int(inner),)
                     except ValueError:
                         return (inner,)
         else:
             # 简单格式
             try:
-                return int(token)
+                # 支持浮点数（半音）
+                if '.' in token:
+                    return float(token)
+                else:
+                    return int(token)
             except ValueError:
                 return token
     
@@ -817,9 +853,16 @@ class SongManager:
         if not token:
             return False
         
-        # 简单音符：数字、休止符、特殊标记
+        # 简单音符：数字、浮点数、休止符、特殊标记
         if token.isdigit() or token in ['-', '0'] or any(c in token for c in ['h', 'l', 'd']):
             return True
+        
+        # 检查是否为浮点数（半音）
+        try:
+            float(token)
+            return True
+        except ValueError:
+            pass
         
         # 括号格式 - 支持嵌套
         if token.startswith('(') and token.endswith(')'):
@@ -859,12 +902,20 @@ class SongManager:
                             return False
                     elif not (part.isdigit() or part in ['-', '0'] or 
                              any(c in part for c in ['h', 'l', 'd'])):
-                        return False
+                        # 检查是否为浮点数（半音）
+                        try:
+                            float(part)
+                        except ValueError:
+                            return False
             else:
                 # 单个元素
                 if not (inner.isdigit() or inner in ['-', '0'] or 
                        any(c in inner for c in ['h', 'l', 'd'])):
-                    return False
+                    # 检查是否为浮点数（半音）
+                    try:
+                        float(inner)
+                    except ValueError:
+                        return False
             
             return True
         except:
@@ -952,9 +1003,12 @@ class SongManager:
         valid_patterns = [
             r'^-$',  # 休止符
             r'^\d+$',  # 数字音符
+            r'^\d+\.\d+$',  # 浮点数音符（半音）
             r'^[lh]\d+$',  # 低音(l)或高音(h)
+            r'^[lh]\d+\.\d+$',  # 低音/高音的浮点数
             r'^\d+d$',  # 带d的音符
-            r'^[\d,()lh-]+$',  # 复合格式（逗号、括号等）
+            r'^\d+\.\d+d$',  # 带d的浮点数音符
+            r'^[\d\.,()lh-]+$',  # 复合格式（逗号、括号等，包含小数点）
         ]
         
         import re
