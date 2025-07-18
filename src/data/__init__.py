@@ -3,4 +3,10 @@
 from .music_theory import *
 from .songs import *
 
-__all__ = ["MusicNotation", "FlutePhysical", "RelativeNote", "PhysicalNote", "SongManager"]
+__all__ = [
+    "MusicNotation",
+    "FlutePhysical",
+    "RelativeNote",
+    "PhysicalNote",
+    "SongManager",
+]

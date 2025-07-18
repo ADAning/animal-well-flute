@@ -5,8 +5,8 @@ from .exceptions import AnimalWellFluteError, ParseError, ConversionError, Playb
 
 __all__ = [
     "get_logger",
-    "AnimalWellFluteError", 
-    "ParseError", 
-    "ConversionError", 
-    "PlaybackError"
+    "AnimalWellFluteError",
+    "ParseError",
+    "ConversionError",
+    "PlaybackError",
 ]
