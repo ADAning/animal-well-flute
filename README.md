@@ -1,8 +1,11 @@
 <div align="center">
   <img src="imgs/logo.png" alt="logo">
 </div>
+<div align="center">
+  A command-line utility to make <strong>Jianpu</strong> (numbered musical notation) playable on the flute in <strong>Animal Well</strong>. <br>
+  This tool allows players to easily translate their favorite melodies into playable animal flute songs.
+</div>
 
-A command-line utility to convert Jianpu (numbered musical notation) into directional inputs for the flute in the game *Animal Well*. This tool allows players to easily translate their favorite melodies into playable in-game flute songs.
 
 <p align="center">
   <a href="https://www.python.org/">
@@ -26,7 +29,6 @@ A command-line utility to convert Jianpu (numbered musical notation) into direct
   - [List Available Songs](#list-available-songs)
   - [Play a Song](#play-a-song)
     - [Advanced: Choosing a Conversion Strategy](#advanced-choosing-a-conversion-strategy)
-  - [Convert a Song File](#convert-a-song-file)
 - [Song File Format](#song-file-format)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
@@ -41,8 +43,8 @@ A command-line utility to convert Jianpu (numbered musical notation) into direct
 
 ### Coming Soon
 
+- [x] **Expanded Song Library**: More pre-converted songs will be added to the library. Community contributions for new songs are highly encouraged!
 - [ ] **Jianpu Auto Importer**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format. Typically, only minor modifications are needed to make the song playable.
-- [ ] **Expanded Song Library**: More pre-converted songs will be added to the library. Community contributions for new songs are highly encouraged!
 - [ ] **GUI Support**: A simple interactive interface that allows users to select songs and set parameters.
 
 ## How It Works
@@ -50,7 +52,7 @@ A command-line utility to convert Jianpu (numbered musical notation) into direct
 The flute in *Animal Well* is played using 8 directions on a controller, corresponding to the 8 notes of a C Major scale. This tool works by mapping the provided Jianpu notation to these in-game directions.
 
 1.  **Parse**: It reads the `jianpu` list from a `.yaml` song file.
-2.  **Convert**: It translates each Jianpu symbol (e.g., `5`, `h1`, `(3,2)`) into its corresponding directional input, applying any necessary transposition based on the chosen strategy.
+2.  **Convert**: It translates each Jianpu symbol (e.g., `5`, `h1`, `(3 2)`) into its corresponding directional input, applying any necessary transposition based on the chosen strategy.
 3.  **Play**: It displays the final directional sequence in the command line, providing a clear guide for in-game performance.
 
 ## Installation
@@ -111,6 +113,14 @@ python cli.py play <song_name> --strategy <strategy_name> [parameter]
 
 **Example:**
 
+If you want to play directly without adding complicated settings:
+
+```bash
+python cli.py play your_song
+```
+
+This is equivalent to using `--strategy auto optimal` by default.
+
 If a song sounds too high, you can try playing it with a lower transposition:
 
 ```bash
@@ -129,17 +139,9 @@ If you wish to use the default offset in a specific song (if any):
 python cli.py play your_song --strategy manual song
 ```
 
-### Convert a Song File
-
-If you have a song file that is not in the `songs/` directory, you can convert it directly using the `convert` command.
-
-```bash
-python cli.py convert /path/to/your/song.yaml
-```
-
 ## Song File Format
 
-Songs are defined in `.yaml` files using a format based on numbered musical notation (Jianpu).
+Songs are defined in `.yaml` files using a format based on **Jianpu**.
 
 **Keys:**
 
@@ -156,9 +158,8 @@ The `jianpu` format uses numbers `1-7` to represent notes. Special characters an
 - **Octaves**: `h` for high (e.g., `h1`), `l` for low (e.g., `l6`).
 - **Rhythm**: Parentheses `()` are used for shorter notes, and `d` might indicate a dotted note (e.g., `5d`).
 - **Rests**: `0` represents a rest.
-- **Chords/Groups**: Notes within parentheses like `(3,2)` can represent quick successive notes or chords.
 
-**Example (`songs/a_dream.yaml`):**
+**Example (`songs/travelers.yaml`):**
 
 ```yaml
 name: Travelers
