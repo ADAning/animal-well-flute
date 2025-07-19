@@ -29,6 +29,7 @@
   - [List Available Songs](#list-available-songs)
   - [Play a Song](#play-a-song)
     - [Advanced: Choosing a Conversion Strategy](#advanced-choosing-a-conversion-strategy)
+  - [Importing a Song from an Image (Experimental)](#importing-a-song-from-an-image-experimental)
 - [Song File Format](#song-file-format)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
@@ -44,7 +45,7 @@
 ### Coming Soon
 
 - [x] **Expanded Song Library**: More pre-converted songs will be added to the library. Community contributions for new songs are highly encouraged!
-- [ ] **Jianpu Auto Importer**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format. Typically, only minor modifications are needed to make the song playable.
+- [x] **Jianpu Auto Importer(Experimental)**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format. Typically, only minor modifications are needed to make the song playable. **Only support Gemini and Doubao now.**
 - [ ] **GUI Support**: A simple interactive interface that allows users to select songs and set parameters.
 
 ## How It Works
@@ -89,7 +90,7 @@ python cli.py list
 To "play" a song from your library, use the `play` command followed by the song's name (without the `.yaml` extension).
 
 ```bash
-python cli.py play big_fish
+python cli.py play travelers
 ```
 
 This will output the directional sequence to your terminal.
@@ -138,6 +139,47 @@ If you wish to use the default offset in a specific song (if any):
 ```bash
 python cli.py play your_song --strategy manual song
 ```
+
+### Importing a Song from an Image (Experimental)
+
+This tool can use AI to recognize a Jianpu image and automatically convert it into the `.yaml` song format.
+
+**Setup:**
+
+This feature requires an API key for either Google Gemini or Doubao. You must set the corresponding environment variable:
+
+-   **For Gemini**: `GOOGLE_API_KEY`
+-   **For Doubao**: `DOUBAO_API_KEY`
+
+You can check the status of the AI services with:
+```bash
+python cli.py ai-status
+```
+
+**Usage:**
+
+To import a song, use the `import` command. You can provide a path to a single image file or a directory.
+
+```bash
+# Import a single image
+python cli.py import path/to/your/song.png
+
+# Import all images from a directory (defaults to the 'sheets/' directory)
+python cli.py import
+# or
+python cli.py import path/to/your/sheets_folder/
+```
+
+-   **Automatic Merging**: If a directory contains multiple images, the tool will treat them as pages of the same song and merge them into a single `.yaml` file. The images are processed in alphabetical order.
+-   **Specify AI Provider**: You can choose which AI service to use (if both are configured).
+    ```bash
+    python cli.py import --ai-provider gemini
+    ```
+-   **Specify Output Directory**: By default, new songs are saved in the `songs/` directory. You can change this with the `--output-dir` flag.
+    ```bash
+    python cli.py import --output-dir path/to/custom/songs/
+    ```
+**Note**: This is an experimental feature. The AI-generated `.yaml` file may require manual corrections for accuracy.
 
 ## Song File Format
 
