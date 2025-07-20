@@ -1,13 +1,13 @@
 <div align="center">
-  <img src="imgs/logo.png" alt="logo">
+  <img src="assets/logo.png" alt="logo">
 </div>
 <div align="center">
   A command-line utility to make <strong>Jianpu</strong> (numbered musical notation) playable on the flute in <strong>Animal Well</strong>. <br>
   This tool allows players to easily translate their favorite melodies into playable animal flute songs.
 </div>
 
-
 <p align="center">
+  <br>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python Version">
   </a>
@@ -16,10 +16,19 @@
   </a>
 </p>
 
+## Quick Look
+
+Here's a quick look at how the tool translates a song for the Animal Well flute:
+
+<div align="center">
+  <img src="assets/demo.jpg" alt="demo">
+</div>
+
 ---
 
 ## Table of Contents
 
+- [Quick Look](#quick-look)
 - [Table of Contents](#table-of-contents)
 - [Features](#features)
   - [Coming Soon](#coming-soon)
@@ -149,7 +158,7 @@ This tool can use AI to recognize a Jianpu image and automatically convert it in
 This feature requires an API key for either Google Gemini or Doubao. You must set the corresponding environment variable:
 
 -   **For Gemini**: `GOOGLE_API_KEY`
--   **For Doubao**: `DOUBAO_API_KEY`
+-   **For Doubao**: `ARK_API_KEY`
 
 You can check the status of the AI services with:
 ```bash

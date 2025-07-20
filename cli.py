@@ -11,22 +11,28 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.core.parser import RelativeParser
 from src.core.converter import AutoConverter
 from src.core.flute import AutoFlute
-from src.data.songs import SongManager
+from src.utils.song_service import get_song_manager
 from src.utils.logger import setup_logging
+from src.utils.import_coordinator import ImportCoordinator
+from src.utils.result_display import ImportResultDisplay
+from src.config import get_app_config
 from src.tools import JianpuSheetImporter, ToolsConfig
 import time
 from pathlib import Path
 import glob
 
 
-def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=5):
+def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=None):
     """自动演奏功能"""
+    
+    # 获取配置
+    config = get_app_config()
 
     # 设置日志
-    setup_logging("INFO")
+    setup_logging(config.log_level)
 
-    # 初始化歌曲管理器
-    song_manager = SongManager(songs_dir=Path("songs"))
+    # 获取共享的歌曲管理器
+    song_manager = get_song_manager(config.songs_dir)
 
     try:
         song = song_manager.get_song(song_name)
@@ -34,7 +40,8 @@ def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=5):
         print(f"❌ 乐曲 '{song_name}' 不存在")
         print(f"📋 可用乐曲: {', '.join(song_manager.list_songs())}")
         return False
-    final_bpm = bpm or song.bpm
+    final_bpm = bpm or song.bpm or config.default_bpm
+    final_ready_time = ready_time if ready_time is not None else config.default_ready_time
 
     print(f"🎵 乐曲: {song.name}")
     print(f"📊 BPM: {final_bpm}")
@@ -129,10 +136,10 @@ def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=5):
     if invalid_count > 0:
         print(f"⚠️ 发现 {invalid_count} 个无法演奏的音符")
 
-    print(f"⏱️ 准备时间: {ready_time} 秒")
+    print(f"⏱️ 准备时间: {final_ready_time} 秒")
     print("🎹 请切换到游戏窗口...")
 
-    for i in range(ready_time, 0, -1):
+    for i in range(final_ready_time, 0, -1):
         print(f"   {i}...")
         time.sleep(1)
 
@@ -148,9 +155,12 @@ def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=5):
 
 def analyze_song(song_name):
     """分析乐曲"""
+    
+    # 获取配置
+    config = get_app_config()
 
-    # 初始化歌曲管理器
-    song_manager = SongManager(songs_dir=Path("songs"))
+    # 获取共享的歌曲管理器
+    song_manager = get_song_manager(config.songs_dir)
 
     try:
         song = song_manager.get_song(song_name)
@@ -187,270 +197,52 @@ def import_sheet(image_paths, ai_provider=None, output_dir=None, debug=False):
     """导入简谱图片功能"""
     
     try:
+        # 获取配置
+        config = get_app_config()
+        
         # 设置日志
-        setup_logging("INFO")
+        setup_logging(config.log_level)
         
-        # 初始化配置和导入器
-        config = ToolsConfig()
-        songs_dir = Path(output_dir) if output_dir else Path("songs")
-        importer = JianpuSheetImporter(config, songs_dir)
+        # 使用导入协调器处理整个流程
+        coordinator = ImportCoordinator(
+            output_dir=Path(output_dir) if output_dir else config.songs_dir,
+            debug=debug
+        )
         
-        # 检查AI服务配置
-        available_providers = importer.list_available_providers()
-        if not available_providers:
+        # 执行导入
+        result = coordinator.coordinate_import(image_paths, ai_provider)
+        
+        # 处理AI服务配置错误
+        if not result.success and result.error and "未配置任何AI服务提供商" in result.error:
             print("❌ 未配置任何AI服务提供商")
             print("请设置以下环境变量之一:")
-            status = importer.get_provider_status()
-            for provider, info in status.items():
-                print(f"   {info['env_key']} - {info['name']}")
+            if hasattr(result, 'provider_status'):
+                for provider, info in result.provider_status.items():
+                    print(f"   {info['env_key']} - {info['name']}")
             return False
         
-        # 选择AI服务提供商
-        if ai_provider:
-            if ai_provider not in available_providers:
-                print(f"❌ 指定的AI服务提供商 '{ai_provider}' 不可用")
-                print(f"可用的服务商: {', '.join(available_providers)}")
-                return False
-            selected_provider = ai_provider
-        else:
-            selected_provider = available_providers[0]
-        
-        print(f"🤖 使用AI服务: {selected_provider}")
-        
-        # 处理图片路径
-        image_files = []
-        for pattern in image_paths:
-            path = Path(pattern)
-            if path.is_file():
-                image_files.append(path)
-            elif path.is_dir():
-                # 递归搜索目录中的图片文件（包括子目录）
-                for ext in ['*.png', '*.jpg', '*.jpeg', '*.webp', '*.bmp']:
-                    image_files.extend(path.rglob(ext))  # 使用rglob递归搜索
-                    image_files.extend(path.rglob(ext.upper()))
-            else:
-                # 使用glob模式匹配
-                matched_files = glob.glob(str(path))
-                image_files.extend([Path(f) for f in matched_files])
-        
-        if not image_files:
-            print(f"❌ 未找到任何图片文件: {image_paths}")
+        # 处理AI服务提供商不可用错误
+        if not result.success and result.error and "不可用" in result.error:
+            print(f"❌ {result.error}")
+            if hasattr(result, 'available_providers'):
+                print(f"可用的服务商: {', '.join(result.available_providers)}")
             return False
         
-        # 去重并排序
-        image_files = sorted(list(set(image_files)))
-        print(f"📁 找到 {len(image_files)} 个图片文件")
+        # 处理其他错误
+        if not result.success:
+            print(f"❌ {result.error}")
+            return False
         
-        # 按文件夹分组图片
-        folder_groups = {}
-        for image_file in image_files:
-            folder_path = image_file.parent
-            if folder_path not in folder_groups:
-                folder_groups[folder_path] = []
-            folder_groups[folder_path].append(image_file)
+        # 显示结果
+        ImportResultDisplay.display_import_results(result, debug)
         
-        # 对每个分组按文件名排序
-        for folder_path in folder_groups:
-            folder_groups[folder_path].sort()
-        
-        print(f"📂 检测到 {len(folder_groups)} 个文件夹")
-        
-        # 显示文件夹信息
-        for folder_path, files_in_folder in folder_groups.items():
-            folder_name = folder_path.name if folder_path.name != "." else "root"
-            print(f"   📁 {folder_name}: {len(files_in_folder)} 个文件")
-        
-        # 处理每个文件夹
-        total_success = 0
-        total_warnings = 0
-        total_failed = 0
-        
-        for folder_path, files_in_folder in folder_groups.items():
-            folder_name = folder_path.name if folder_path.name != "." else "root"
-            
-            try:
-                if len(files_in_folder) == 1:
-                    # 单张图片
-                    print(f"\n📄 处理单张图片: {folder_name}")
-                    result = importer.import_single_image(files_in_folder[0], selected_provider)
-                    _print_import_result(result, files_in_folder[0], debug)
-                    if result.get("success", False):
-                        if result.get("has_warnings", False):
-                            total_warnings += 1
-                        else:
-                            total_success += 1
-                    else:
-                        total_failed += 1
-                else:
-                    # 多张图片合并为一首歌
-                    print(f"\n🎵 合并文件夹 '{folder_name}' 中的 {len(files_in_folder)} 张图片...")
-                    result = importer.import_multiple_images(files_in_folder, selected_provider, folder_name)
-                    _print_multi_image_result(result, debug)
-                    if result.get("success", False):
-                        if result.get("has_warnings", False):
-                            total_warnings += 1
-                        else:
-                            total_success += 1
-                    else:
-                        total_failed += 1
-            except Exception as e:
-                print(f"\n❌ 处理文件夹 '{folder_name}' 时发生异常: {e}")
-                print(f"   跳过此文件夹，继续处理其他文件夹...")
-                total_failed += 1
-                import traceback
-                print(f"   详细错误: {traceback.format_exc()}")
-                continue
-        
-        # 显示总结
-        if len(folder_groups) > 1:
-            print(f"\n📊 导入完成:")
-            print(f"   完全成功: {total_success} 个")
-            if total_warnings > 0:
-                print(f"   有警告: {total_warnings} 个（文件已生成，但需要手动修复）")
-            print(f"   失败: {total_failed} 个")
-        
-        return (total_success + total_warnings) > 0
+        return (result.total_success + result.total_warnings) > 0
     
     except Exception as e:
         print(f"\n💥 导入过程中发生未预期的异常: {e}")
         import traceback
         print(f"详细错误信息:\n{traceback.format_exc()}")
         return False
-
-
-def _print_multi_image_result(result, debug=False):
-    """打印多图片合并导入结果"""
-    if result.get("success", False):
-        # 区分成功和带警告的成功
-        if result.get("has_warnings", False):
-            print(f"⚠️ 多图片合并完成（有警告）!")
-            print(f"   📄 输出文件: {result['output_file']}")
-            print(f"   🎵 歌曲名称: {result['combined_result']['name']}")
-            print(f"   📊 简谱行数: {result['sections_count']}")
-            print(f"   📸 处理图片: {result['images_processed']} 张")
-            print(f"   ⚠️ 警告: {result['warning_message']}")
-            
-            # 显示AI响应用于调试
-            if result.get('ai_response_info', {}).get('raw_response'):
-                print(f"   🤖 AI完整响应:")
-                print(f"      {result['ai_response_info']['raw_response']}")
-        else:
-            print(f"✅ 多图片合并成功!")
-            print(f"   📄 输出文件: {result['output_file']}")
-            print(f"   🎵 歌曲名称: {result['combined_result']['name']}")
-            print(f"   📊 简谱行数: {result['sections_count']}")
-            print(f"   📸 处理图片: {result['images_processed']} 张")
-            if result['combined_result'].get('bpm'):
-                print(f"   ⏱️ BPM: {result['combined_result']['bpm']}")
-            print(f"   🤖 使用服务: {result['combined_result']['provider']}")
-            if result['combined_result'].get('notes'):
-                print(f"   📝 合并备注: {result['combined_result']['notes']}")
-    else:
-        print(f"❌ 多图片合并失败")
-        error_msg = result.get('error', '未知错误')
-        print(f"   错误: {error_msg}")
-        if result.get('failed_image'):
-            print(f"   失败图片: {result['failed_image']}")
-        
-        # 显示AI响应（验证错误时）
-        if result.get('ai_response_info', {}).get('raw_response'):
-            print(f"   🤖 AI完整响应:")
-            print(f"      {result['ai_response_info']['raw_response']}")
-        
-        # 显示部分成功的图片
-        if result.get('processed_images'):
-            print(f"   ✅ 已处理: {result['processed_images']} 张图片")
-        if result.get('partial_results'):
-            print(f"   📋 部分结果可用，但最终合并失败")
-
-
-def _print_import_result(result, image_path, debug=False):
-    """打印单个导入结果"""
-    if result.get("success", False):
-        # 区分成功和带警告的成功
-        if result.get("has_warnings", False):
-            print(f"⚠️ 导入完成（有警告）: {image_path}")
-            print(f"   📄 输出文件: {result['output_file']}")
-            print(f"   🎵 歌曲名称: {result['song_name']}")
-            print(f"   📊 小节数量: {result['measures_count']}")
-            print(f"   🤖 使用服务: {result['provider_used']}")
-            print(f"   ⚠️ 警告: {result['warning_message']}")
-            
-            # 显示AI响应用于调试
-            if result.get('ai_response_info', {}).get('raw_response'):
-                print(f"   🤖 AI完整响应:")
-                print(f"      {result['ai_response_info']['raw_response']}")
-        else:
-            print(f"✅ 导入成功: {image_path}")
-            print(f"   📄 输出文件: {result['output_file']}")
-            print(f"   🎵 歌曲名称: {result['song_name']}")
-            print(f"   📊 小节数量: {result['measures_count']}")
-            print(f"   🤖 使用服务: {result['provider_used']}")
-            if result.get('recognition_notes'):
-                print(f"   📝 识别备注: {result['recognition_notes']}")
-        
-        # 显示额外的AI响应信息（debug模式）
-        if debug and result.get('raw_response'):
-            print(f"   🤖 AI完整响应:")
-            print(f"      {result['raw_response']}")
-        if result.get('model'):
-            print(f"   🔧 AI模型: {result['model']}")
-        if result.get('processing_time'):
-            print(f"   ⏱️ 处理时间: {result['processing_time']:.2f}秒")
-        if result.get('retry_count', 0) > 0:
-            print(f"   🔄 重试次数: {result['retry_count']}")
-    else:
-        print(f"❌ 导入失败: {image_path}")
-        error_msg = result.get('error', '未知错误')
-        print(f"   错误: {error_msg}")
-        
-        # 显示AI完整响应（验证错误时的关键信息）
-        if result.get('ai_response_info', {}).get('raw_response'):
-            print(f"   🤖 AI完整响应:")
-            print(f"      {result['ai_response_info']['raw_response']}")
-        
-        # 简化的验证错误显示
-        if "validation failed" in error_msg.lower():
-            import re
-            match = re.search(r'validation failed:\s*(\[.*\])', error_msg)
-            if match:
-                try:
-                    import ast
-                    error_list = ast.literal_eval(match.group(1))
-                    if isinstance(error_list, list) and error_list:
-                        print(f"   ❌ 验证错误 ({len(error_list)} 个):")
-                        for error in error_list[:3]:  # 只显示前3个
-                            print(f"      • {error}")
-                        if len(error_list) > 3:
-                            print(f"      • ... 还有 {len(error_list) - 3} 个错误")
-                except (ValueError, SyntaxError):
-                    pass
-
-
-
-def _print_batch_result(batch_result, debug=False):
-    """打印批量导入结果"""
-    total = batch_result["total_images"]
-    success = batch_result["successful_imports"]
-    failed = batch_result["failed_imports"]
-    
-    print(f"\n📊 批量导入完成:")
-    print(f"   总计: {total} 个文件")
-    print(f"   成功: {success} 个")
-    print(f"   失败: {failed} 个")
-    
-    if failed > 0:
-        print("\n❌ 失败的文件:")
-        for item in batch_result["results"]:
-            if not item["result"].get("success", False):
-                filename = Path(item['image_path']).name
-                error_msg = item['result'].get('error', '未知错误')
-                print(f"   {filename}: {error_msg}")
-                
-                # 显示AI响应（最重要的调试信息）
-                if item['result'].get('ai_response_info', {}).get('raw_response'):
-                    ai_response = item['result']['ai_response_info']['raw_response']
-                    print(f"      🤖 AI响应: {ai_response}")
 
 
 def check_ai_status():
@@ -473,8 +265,9 @@ def check_ai_status():
 
 def list_songs():
     """列出可用乐曲"""
-    # 初始化歌曲管理器
-    song_manager = SongManager(songs_dir=Path("songs"))
+    # 获取配置和共享的歌曲管理器
+    config = get_app_config()
+    song_manager = get_song_manager(config.songs_dir)
 
     print("📋 可用乐曲:")
     for song_key in sorted(song_manager.list_songs()):
@@ -500,7 +293,7 @@ def main():
         help="映射策略: auto high/low/optimal, manual <offset|song>, none (manual song 使用乐曲文件中的相对偏移量)",
     )
     play_parser.add_argument("--bpm", type=int, help="BPM (覆盖默认值)")
-    play_parser.add_argument("--ready-time", type=int, default=5, help="准备时间")
+    play_parser.add_argument("--ready-time", type=int, help="准备时间（默认从配置读取）")
 
     # analyze 命令
     analyze_parser = subparsers.add_parser("analyze", help="分析乐曲")
@@ -512,7 +305,7 @@ def main():
                               help="图片文件、目录名或文件夹路径 (默认: sheets/) - 同一文件夹中的图片自动合并为一首歌")
     import_parser.add_argument("--ai-provider", choices=["gemini", "doubao"], 
                               help="指定AI服务提供商")
-    import_parser.add_argument("--output-dir", help="输出目录 (默认: songs/)")
+    import_parser.add_argument("--output-dir", help="输出目录（默认从配置读取）")
     import_parser.add_argument("--debug", action="store_true", help="显示详细的AI响应信息")
 
     # ai-status 命令

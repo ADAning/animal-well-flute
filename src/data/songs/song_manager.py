@@ -263,47 +263,41 @@ class SongManager:
         Returns:
             解析后的音符数据：数字、字符串或元组
         """
-        token = token.strip()
+        return self._parse_token_recursive(token.strip())
+
+    def _parse_token_recursive(self, token: str) -> Any:
+        """递归解析token - 统一处理括号和基本token
+
+        Args:
+            token: 要解析的token
+
+        Returns:
+            解析后的数据
+        """
         if not token:
             return ""
 
         # 处理括号表达式
         if token.startswith("(") and token.endswith(")"):
-            return self._parse_parenthesized_expression(token)
+            inner = token[1:-1].strip()
+            if not inner:
+                return ()
 
-        # 处理基本token（数字、字符串）
+            # 智能分割并递归解析
+            parts = self._split_by_space_smart(inner)
+            parsed_parts = []
+            
+            for part in parts:
+                part = part.strip()
+                if part:
+                    parsed_parts.append(self._parse_token_recursive(part))
+
+            # 返回适当的元组格式
+            return (tuple(parsed_parts) if len(parsed_parts) > 1 
+                   else (parsed_parts[0],) if parsed_parts else ())
+
+        # 处理基本token（数字或字符串）
         return self._parse_basic_token(token)
-
-    def _parse_parenthesized_expression(self, token: str) -> tuple:
-        """解析括号表达式 如 "(3 4)" 或 "(l5 (1 2))"
-
-        Args:
-            token: 括号包围的表达式
-
-        Returns:
-            解析后的元组
-        """
-        # 去掉外层括号
-        inner = token[1:-1].strip()
-        if not inner:
-            return ()
-
-        # 使用智能空格分割
-        parts = self._split_by_space_smart(inner)
-
-        # 递归解析每个部分
-        parsed_parts = []
-        for part in parts:
-            part = part.strip()
-            if part:  # 跳过空字符串
-                parsed_parts.append(self._parse_note_token(part))
-
-        # 返回元组（保持单元素元组的格式）
-        return (
-            tuple(parsed_parts)
-            if len(parsed_parts) > 1
-            else (parsed_parts[0],) if parsed_parts else ()
-        )
 
     def _parse_basic_token(self, token: str) -> Any:
         """解析基本token - 数字或字符串
@@ -314,13 +308,11 @@ class SongManager:
         Returns:
             int, float 或 str
         """
-        token = token.strip()
-
         # 尝试解析为数字
         try:
             return float(token) if "." in token else int(token)
         except ValueError:
-            # 不是数字，返回字符串（处理如 "h1", "5d", "-" 等）
+            # 不是数字，返回字符串
             return token
 
     def _detect_yaml_format(self, data: Dict) -> str:
@@ -372,71 +364,58 @@ class SongManager:
         for bar in jianpu:
             bar_notes = []
             for note in bar:
-                bar_notes.append(self._note_to_string_unified(note))
+                bar_notes.append(self._note_to_string(note, "unified"))
             simplified_jianpu.append(" ".join(bar_notes))
 
         return simplified_jianpu
 
-    def _note_to_string_unified(self, note: Any) -> str:
-        """将音符转换为统一括号格式的字符串
-
-        Args:
-            note: 音符数据（可以是字符串、数字、元组等）
-
-        Returns:
-            统一格式的字符串，如 "3" 或 "(3,4)" 或 "(3)"
-        """
-        if isinstance(note, str):
-            # 如果已经是字符串，检查是否需要加括号
-            if (
-                note in ["-", "0"]
-                or note.isdigit()
-                or any(c in note for c in ["h", "l", "d"])
-            ):
-                return note  # 简单音符不需要括号
-            else:
-                return f"({note})"  # 复杂字符串加括号
-        elif isinstance(note, (int, float)):
-            return str(note)
-        elif isinstance(note, tuple):
-            # 所有元组都用括号包围
-            parts = [self._note_to_string_unified(part) for part in note]
-            return f"({','.join(parts)})"
-        else:
-            return str(note)
-
-    def _note_to_string(self, note: Any) -> str:
+    def _note_to_string(self, note: Any, format_style: str = "unified") -> str:
         """将音符转换为字符串格式
-
+        
         Args:
             note: 音符数据（可以是字符串、数字、元组等）
-
+            format_style: 格式化风格 ("unified" 或 "legacy")
+            
         Returns:
             字符串格式的音符
         """
         if isinstance(note, str):
-            return note
+            if format_style == "unified":
+                # 统一格式：简单音符不需要括号，复杂的加括号
+                if (note in ["-", "0"] or note.isdigit() or 
+                    any(c in note for c in ["h", "l", "d"])):
+                    return note
+                else:
+                    return f"({note})"
+            else:
+                return note
+                
         elif isinstance(note, (int, float)):
             return str(note)
+            
         elif isinstance(note, tuple):
-            # 处理元组：递归转换每个元素
-            parts = [self._note_to_string(part) for part in note]
-
-            # 特殊情况：单元素元组，需要保持括号
-            if len(parts) == 1:
-                return f"({parts[0]})"
-
-            # 如果元组中包含其他元组，需要使用括号
-            if any(" " in part and "(" in part for part in parts):
-                formatted_parts = []
-                for part in parts:
-                    if " " in part and "(" in part:
-                        formatted_parts.append(f"({part})")
-                    else:
-                        formatted_parts.append(part)
-                return " ".join(formatted_parts)
+            # 递归转换每个元素
+            parts = [self._note_to_string(part, format_style) for part in note]
+            
+            if format_style == "unified":
+                # 统一格式：所有元组都用括号包围，用逗号分隔
+                return f"({','.join(parts)})"
             else:
-                return " ".join(parts)
+                # 传统格式：保持原有逻辑
+                if len(parts) == 1:
+                    return f"({parts[0]})"
+                    
+                # 如果元组中包含其他元组，需要使用括号
+                if any(" " in part and "(" in part for part in parts):
+                    formatted_parts = []
+                    for part in parts:
+                        if " " in part and "(" in part:
+                            formatted_parts.append(f"({part})")
+                        else:
+                            formatted_parts.append(part)
+                    return " ".join(formatted_parts)
+                else:
+                    return " ".join(parts)
         else:
             return str(note)
 
