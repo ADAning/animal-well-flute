@@ -155,7 +155,7 @@ class SongSelector:
         return matching_songs
 
     def select_song_simple(self, prompt_text: str = "选择歌曲") -> Optional[str]:
-        """简单的歌曲选择界面 - 使用序号选择"""
+        """简单的歌曲选择界面 - 使用序号选择（与analyze/play相同的动态搜索）"""
         if not self.songs:
             self.console.print("[red]❌ 没有可用的歌曲[/red]")
             return None
@@ -275,52 +275,65 @@ class SongSelector:
         except KeyboardInterrupt:
             return None
 
-    def _display_song_list(self, songs: List[SongInfo], max_display: int = 20):
-        """显示歌曲列表"""
+    def _display_song_list_paginated(
+        self, songs: List[SongInfo], page: int = 0, page_size: int = 20
+    ):
+        """分页显示歌曲列表"""
         if not songs:
             self.console.print("[red]没有歌曲可显示[/red]")
             return
 
+        total_pages = (len(songs) - 1) // page_size + 1
+        start_idx = page * page_size
+        end_idx = min(start_idx + page_size, len(songs))
+        display_songs = songs[start_idx:end_idx]
+
         # 创建表格
+        page_info = f"第 {page + 1}/{total_pages} 页" if total_pages > 1 else ""
         table = Table(
-            title=f"歌曲列表 (共 {len(songs)} 首)",
+            title=f"歌曲列表 (共 {len(songs)} 首) {page_info}",
             show_header=True,
             header_style="bold cyan",
             show_lines=True,
         )
 
-        table.add_column("序号", style="cyan", width=4)
+        table.add_column("序号", style="cyan", width=6)
         table.add_column("歌曲名称", style="bold", min_width=20)
         table.add_column("BPM", style="green", width=6)
         table.add_column("小节数", style="yellow", width=6)
         table.add_column("描述", style="dim", min_width=20)
 
-        # 添加行数据
-        display_songs = songs[:max_display]
-        for i, song in enumerate(display_songs, 1):
+        # 添加行数据，序号保持全局序号
+        for i, song in enumerate(display_songs):
+            global_idx = start_idx + i + 1
             description = (
                 song.description[:30] + "..."
                 if len(song.description) > 30
                 else song.description
             )
             table.add_row(
-                str(i),
+                str(global_idx),
                 song.name,
                 str(song.bpm),
                 str(song.bars),
                 description or "[dim]无描述[/dim]",
             )
 
-        if len(songs) > max_display:
-            table.add_row(
-                "...",
-                f"还有 {len(songs) - max_display} 首歌曲",
-                "",
-                "",
-                "[dim]请精确搜索关键词[/dim]",
-            )
-
         self.console.print(table)
+
+        # 显示翻页提示
+        if total_pages > 1:
+            nav_tips = []
+            if page > 0:
+                nav_tips.append("'p' 或 'prev' 上一页")
+            if page < total_pages - 1:
+                nav_tips.append("'n' 或 'next' 下一页")
+            if nav_tips:
+                self.console.print(f"[dim]导航: {' | '.join(nav_tips)}[/dim]")
+
+    def _display_song_list(self, songs: List[SongInfo], max_display: int = 20):
+        """显示歌曲列表 - 保持向后兼容"""
+        self._display_song_list_paginated(songs, page=0, page_size=max_display)
 
     def get_song_info(self, song_key: str) -> Optional[Dict]:
         """获取歌曲详细信息"""
@@ -330,8 +343,86 @@ class SongSelector:
             return None
 
     def list_all_songs(self):
-        """列出所有歌曲"""
-        self._display_song_list(self.songs)
+        """列出所有歌曲 - 支持翻页浏览（直接按键响应）"""
+        if not self.songs:
+            self.console.print("[red]❌ 没有可用的歌曲[/red]")
+            return
+
+        import sys
+        import tty
+        import termios
+
+        current_page = 0
+        page_size = 20
+        total_pages = (len(self.songs) - 1) // page_size + 1
+
+        def get_single_char():
+            """获取单个字符输入（不需要回车）"""
+            if sys.platform == "win32":
+                import msvcrt
+
+                return msvcrt.getch().decode("utf-8").lower()
+            else:
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+                try:
+                    tty.cbreak(fd)
+                    char = sys.stdin.read(1).lower()
+                finally:
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                return char
+
+        while True:
+            # 清屏并显示当前页
+            self.console.clear()
+            self._display_song_list_paginated(
+                self.songs, page=current_page, page_size=page_size
+            )
+
+            # 显示导航提示
+            nav_tips = []
+            if current_page > 0:
+                nav_tips.append("[cyan]p[/cyan] 上一页")
+            if current_page < total_pages - 1:
+                nav_tips.append("[cyan]n[/cyan] 下一页")
+            nav_tips.append("[cyan]q[/cyan] 退出")
+
+            self.console.print(f"\n[dim]导航: {' | '.join(nav_tips)}[/dim]")
+            self.console.print("[dim]请按键 (无需回车):[/dim]", end=" ")
+
+            try:
+                # 获取单个字符
+                char = get_single_char()
+
+                if char == "q":
+                    break
+                elif char == "p" and current_page > 0:
+                    current_page -= 1
+                elif char == "n" and current_page < total_pages - 1:
+                    current_page += 1
+                elif char == "\x03":  # Ctrl+C
+                    break
+                # 忽略其他按键
+
+            except KeyboardInterrupt:
+                break
+            except Exception:
+                # 如果直接按键不可用，回退到传统方式
+                self.console.print(
+                    "\n[yellow]直接按键不可用，使用传统输入模式[/yellow]"
+                )
+                try:
+                    choice = (
+                        prompt("请输入 p(上一页)/n(下一页)/q(退出): ").strip().lower()
+                    )
+                    if choice == "q":
+                        break
+                    elif choice == "p" and current_page > 0:
+                        current_page -= 1
+                    elif choice == "n" and current_page < total_pages - 1:
+                        current_page += 1
+                except KeyboardInterrupt:
+                    break
 
     def search_and_display(self, query: str):
         """搜索并显示结果"""

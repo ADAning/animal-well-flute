@@ -77,6 +77,32 @@ The flute in *Animal Well* is played using 8 directions on a controller, corresp
 
 This feature leverages a **multimodal large language model (MLLM)** to provide an end-to-end solution for converting Jianpu images directly into the project's `.yaml` song format. The MLLM handles the entire process seamlessly: it analyzes the image, recognizes the musical notation, and generates the final, structured `.yaml` content, automating the transcription process from start to finish.
 
+```mermaid
+
+flowchart LR
+
+A["📄<br/>Jianpu Image"] --> B["🤖<br/>MLLM<br/>End-to-End Recognition"]
+
+B --> C["📝<br/>YAML Song"]
+
+C --> D["🎮<br/>Play in Animal Well!"]
+
+style A fill:#fafafa,stroke:#424242,stroke-width:2px,color:#212121
+
+style B fill:#e8f5e9,stroke:#4caf50,stroke-width:4px,color:#1b5e20
+
+style C fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px,color:#4a148c
+
+style D fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#0d47a1
+
+linkStyle 0 stroke:#4caf50,stroke-width:3px
+
+linkStyle 1 stroke:#9c27b0,stroke-width:3px
+
+linkStyle 2 stroke:#2196f3,stroke-width:3px
+
+```
+
 ## Installation
 
 1.  **Clone the repository:**

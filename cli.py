@@ -301,9 +301,154 @@ def check_ai_status():
         print()
 
 
-def list_songs():
+def interactive_list_songs():
+    """交互式歌曲列表浏览功能 - 使用与analyze/play相同的动态选择界面"""
+    # 获取配置和组件
+    config = get_app_config()
+    song_manager = get_song_manager(config.songs_dir)
+    ui_manager = InteractiveManager()
+    song_selector = SongSelector(song_manager)
+
+    ui_manager.show_welcome("歌曲列表浏览")
+
+    while True:
+        options = [
+            {"key": "browse", "desc": "🎵 浏览和选择歌曲 (动态搜索)"},
+            {"key": "list", "desc": "📋 显示所有歌曲 (静态列表)"},
+        ]
+
+        choice = ui_manager.show_menu("歌曲浏览模式", options, show_quit=True)
+
+        if choice is None:
+            break
+
+        try:
+            if choice == "browse":
+                # 使用与analyze/play相同的动态选择界面
+                ui_manager.show_info("进入动态歌曲浏览模式...")
+                ui_manager.show_info(
+                    "💡 提示: 输入关键词可实时搜索，输入数字可直接选择"
+                )
+
+                # 使用SongSelector的select_song_simple方法，这与analyze/play使用的是同一个
+                selected_song = song_selector.select_song_simple(
+                    "🎵 浏览歌曲 (支持实时搜索)"
+                )
+
+                if selected_song:
+                    ui_manager.show_success(f"您选择了: {selected_song}")
+
+                    # 显示歌曲详细信息
+                    try:
+                        song = song_manager.get_song(selected_song)
+                        ui_manager.show_info(f"🎼 歌曲名称: {song.name}")
+                        ui_manager.show_info(f"🎵 BPM: {song.bpm}")
+                        if song.description:
+                            ui_manager.show_info(f"📝 描述: {song.description}")
+                        ui_manager.show_info(f"📊 小节数: {len(song.jianpu)}")
+
+                        # 询问是否要演奏
+                        if ui_manager.confirm("🎹 是否要演奏这首歌？", default=True):
+                            ui_manager.show_progress("准备演奏...")
+
+                            # 询问演奏参数
+                            play_options = [
+                                {"key": "default", "desc": "🎵 使用默认设置演奏"},
+                                {"key": "custom", "desc": "⚙️ 自定义演奏参数"},
+                            ]
+
+                            play_choice = ui_manager.show_menu(
+                                "演奏选项", play_options, show_quit=False
+                            )
+
+                            # 准备演奏参数
+                            strategy_args = ["optimal"]  # 默认策略
+                            bpm = None  # 使用歌曲默认BPM
+                            ready_time = None  # 使用配置默认准备时间
+
+                            if play_choice == "custom":
+                                # 自定义参数
+                                strategy_options = [
+                                    {"key": "optimal", "desc": "🎯 最佳策略 (推荐)"},
+                                    {"key": "high", "desc": "⬆️ 高音优先策略"},
+                                    {"key": "low", "desc": "⬇️ 低音优先策略"},
+                                ]
+
+                                strategy_choice = ui_manager.show_menu(
+                                    "选择演奏策略", strategy_options, show_quit=False
+                                )
+                                if strategy_choice:
+                                    strategy_args = [strategy_choice]
+
+                                # 可选的BPM设置
+                                custom_bpm = ui_manager.input_number(
+                                    f"自定义BPM (当前: {song.bpm}, 留空使用默认)",
+                                    default=None,
+                                    min_value=30,
+                                    max_value=300,
+                                )
+                                if custom_bpm:
+                                    bpm = int(custom_bpm)
+
+                                # 可选的准备时间
+                                custom_ready_time = ui_manager.input_number(
+                                    "准备时间(秒) (留空使用默认)",
+                                    default=None,
+                                    min_value=0,
+                                    max_value=30,
+                                )
+                                if custom_ready_time is not None:
+                                    ready_time = int(custom_ready_time)
+
+                            # 执行演奏
+                            ui_manager.show_info("🎼 开始演奏...")
+                            try:
+                                result = auto_play(
+                                    selected_song,
+                                    strategy_args,
+                                    bpm,
+                                    ready_time,
+                                    interactive=False,
+                                )
+                                if result:
+                                    ui_manager.show_success("🎉 演奏完成！")
+                                else:
+                                    ui_manager.show_warning("演奏未完成")
+                            except Exception as e:
+                                ui_manager.show_error(f"演奏时发生错误: {e}")
+                        else:
+                            ui_manager.show_info("已取消演奏")
+
+                    except Exception as e:
+                        ui_manager.show_warning(f"无法获取歌曲详细信息: {e}")
+                else:
+                    ui_manager.show_info("未选择歌曲")
+
+                ui_manager.pause()
+
+            elif choice == "list":
+                # 显示所有歌曲的静态列表
+                ui_manager.show_info("正在加载歌曲列表...")
+                song_selector.list_all_songs()
+                ui_manager.pause()
+
+        except KeyboardInterrupt:
+            ui_manager.show_info("\n操作已取消")
+            break
+        except Exception as e:
+            ui_manager.show_error(f"执行操作时发生错误: {e}")
+            ui_manager.pause()
+
+    ui_manager.exit_gracefully()
+
+
+def list_songs(interactive=False):
     """列出可用乐曲"""
-    # 获取配置和共享的歌曲管理器
+    if interactive:
+        interactive_list_songs()
+        return
+
+    # 原有的非交互式实现
     config = get_app_config()
     song_manager = get_song_manager(config.songs_dir)
 
@@ -343,8 +488,8 @@ def interactive_main_menu():
             elif choice == "analyze":
                 analyze_song(None, interactive=True)
             elif choice == "list":
-                list_songs()
-                ui_manager.pause()
+                # 在交互式主菜单中默认使用交互式列表
+                list_songs(interactive=True)
             elif choice == "import":
                 ui_manager.show_info("进入图片导入功能...")
                 # 这里可以添加交互式的导入功能
@@ -417,6 +562,9 @@ def main():
 
     # list 命令
     list_parser = subparsers.add_parser("list", help="列出可用乐曲")
+    list_parser.add_argument(
+        "--interactive", "-i", action="store_true", help="使用交互式模式浏览和搜索歌曲"
+    )
 
     # interactive 命令
     interactive_parser = subparsers.add_parser("interactive", help="进入交互式主菜单")
@@ -442,7 +590,7 @@ def main():
     elif args.command == "ai-status":
         check_ai_status()
     elif args.command == "list":
-        list_songs()
+        list_songs(args.interactive)
     elif args.command == "interactive":
         interactive_main_menu()
     else:
