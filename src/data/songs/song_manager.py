@@ -19,14 +19,19 @@ class SongManager:
 
     def __init__(self, songs_dir: Optional[Path] = None):
         self.songs_dir = songs_dir or Path("songs")
-        self.songs: Dict[str, Song] = {}
+        self.songs: Dict[str, Song] = {}  # key -> Song
+        self.name_to_key: Dict[str, str] = {}  # name -> key 映射
         self._load_songs()
 
     def _load_songs(self) -> None:
         """加载所有乐曲数据"""
         # 加载内置示例乐曲
-        self.songs.update(get_sample_songs())
-        logger.info(f"Loaded {len(self.songs)} sample songs")
+        sample_songs = get_sample_songs()
+        self.songs.update(sample_songs)
+        # 为示例歌曲添加name到key的映射
+        for key, song in sample_songs.items():
+            self.name_to_key[song.name] = key
+        logger.info(f"Loaded {len(sample_songs)} sample songs")
 
         # 加载外部乐曲文件
         if self.songs_dir.exists():
@@ -66,7 +71,9 @@ class SongManager:
                     )
 
                 song = Song(**data)
-                self.songs[song.name.lower().replace(" ", "_")] = song
+                key = song.name.lower().replace(" ", "_")
+                self.songs[key] = song
+                self.name_to_key[song.name] = key  # 添加name到key的映射
                 external_count += 1
                 logger.debug(f"Loaded external song: {song.name}")
 
@@ -78,7 +85,9 @@ class SongManager:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     song = Song(**data)
-                    self.songs[song.name.lower().replace(" ", "_")] = song
+                    key = song.name.lower().replace(" ", "_")
+                    self.songs[key] = song
+                    self.name_to_key[song.name] = key  # 添加name到key的映射
                     external_count += 1
                     logger.debug(f"Loaded external song: {song.name}")
             except Exception as e:
@@ -91,7 +100,7 @@ class SongManager:
         """获取指定名称的乐曲
 
         Args:
-            name: 乐曲名称
+            name: 乐曲名称或key
 
         Returns:
             Song: 乐曲对象
@@ -99,14 +108,80 @@ class SongManager:
         Raises:
             SongNotFoundError: 乐曲未找到
         """
+        # 首先尝试通过exact name匹配
+        if name in self.name_to_key:
+            key = self.name_to_key[name]
+            return self.songs[key]
+
+        # 如果没有找到，尝试通过key匹配（向后兼容）
         key = name.lower().replace(" ", "_")
+        if key in self.songs:
+            return self.songs[key]
+
+        raise SongNotFoundError(f"Song '{name}' not found")
+
+    def get_song_by_name(self, name: str) -> Song:
+        """通过歌曲名称获取乐曲（精确匹配Name字段）
+
+        Args:
+            name: 歌曲的Name字段
+
+        Returns:
+            Song: 乐曲对象
+
+        Raises:
+            SongNotFoundError: 乐曲未找到
+        """
+        if name not in self.name_to_key:
+            raise SongNotFoundError(f"Song with name '{name}' not found")
+
+        key = self.name_to_key[name]
+        return self.songs[key]
+
+    def get_song_by_key(self, key: str) -> Song:
+        """通过key获取乐曲
+
+        Args:
+            key: 乐曲key
+
+        Returns:
+            Song: 乐曲对象
+
+        Raises:
+            SongNotFoundError: 乐曲未找到
+        """
         if key not in self.songs:
-            raise SongNotFoundError(f"Song '{name}' not found")
+            raise SongNotFoundError(f"Song with key '{key}' not found")
         return self.songs[key]
 
     def list_songs(self) -> List[str]:
-        """列出所有可用的乐曲名称"""
+        """列出所有可用的乐曲key（向后兼容）"""
         return list(self.songs.keys())
+
+    def list_song_names(self) -> List[str]:
+        """列出所有歌曲的Name字段"""
+        return list(self.name_to_key.keys())
+
+    def list_songs_with_info(self) -> List[Dict[str, str]]:
+        """列出所有歌曲的详细信息
+
+        Returns:
+            包含name, key, bpm, bars等信息的字典列表
+        """
+        songs_info = []
+        for name, key in self.name_to_key.items():
+            song = self.songs[key]
+            bars_count = len(song.jianpu) if song.jianpu else 0
+            songs_info.append(
+                {
+                    "name": song.name,
+                    "key": key,
+                    "bpm": str(song.bpm),
+                    "description": song.description or "",
+                    "bars": str(bars_count),
+                }
+            )
+        return sorted(songs_info, key=lambda x: x["name"])
 
     def get_song_info(self, name: str) -> Dict:
         """获取乐曲信息
@@ -134,6 +209,7 @@ class SongManager:
         """
         key = song.name.lower().replace(" ", "_")
         self.songs[key] = song
+        self.name_to_key[song.name] = key  # 添加name到key的映射
         logger.info(f"Added song: {song.name}")
 
     def save_song(self, song: Song, file_path: Path) -> None:
@@ -286,15 +362,18 @@ class SongManager:
             # 智能分割并递归解析
             parts = self._split_by_space_smart(inner)
             parsed_parts = []
-            
+
             for part in parts:
                 part = part.strip()
                 if part:
                     parsed_parts.append(self._parse_token_recursive(part))
 
             # 返回适当的元组格式
-            return (tuple(parsed_parts) if len(parsed_parts) > 1 
-                   else (parsed_parts[0],) if parsed_parts else ())
+            return (
+                tuple(parsed_parts)
+                if len(parsed_parts) > 1
+                else (parsed_parts[0],) if parsed_parts else ()
+            )
 
         # 处理基本token（数字或字符串）
         return self._parse_basic_token(token)
@@ -371,32 +450,35 @@ class SongManager:
 
     def _note_to_string(self, note: Any, format_style: str = "unified") -> str:
         """将音符转换为字符串格式
-        
+
         Args:
             note: 音符数据（可以是字符串、数字、元组等）
             format_style: 格式化风格 ("unified" 或 "legacy")
-            
+
         Returns:
             字符串格式的音符
         """
         if isinstance(note, str):
             if format_style == "unified":
                 # 统一格式：简单音符不需要括号，复杂的加括号
-                if (note in ["-", "0"] or note.isdigit() or 
-                    any(c in note for c in ["h", "l", "d"])):
+                if (
+                    note in ["-", "0"]
+                    or note.isdigit()
+                    or any(c in note for c in ["h", "l", "d"])
+                ):
                     return note
                 else:
                     return f"({note})"
             else:
                 return note
-                
+
         elif isinstance(note, (int, float)):
             return str(note)
-            
+
         elif isinstance(note, tuple):
             # 递归转换每个元素
             parts = [self._note_to_string(part, format_style) for part in note]
-            
+
             if format_style == "unified":
                 # 统一格式：所有元组都用括号包围，用逗号分隔
                 return f"({','.join(parts)})"
@@ -404,7 +486,7 @@ class SongManager:
                 # 传统格式：保持原有逻辑
                 if len(parts) == 1:
                     return f"({parts[0]})"
-                    
+
                 # 如果元组中包含其他元组，需要使用括号
                 if any(" " in part and "(" in part for part in parts):
                     formatted_parts = []

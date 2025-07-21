@@ -31,13 +31,16 @@ Here's a quick look at how the tool translates a song for the Animal Well flute:
 - [Quick Look](#quick-look)
 - [Table of Contents](#table-of-contents)
 - [Features](#features)
-  - [Coming Soon](#coming-soon)
+  - [TODO List](#todo-list)
 - [How It Works](#how-it-works)
+  - [Jianpu to Flute Conversion](#jianpu-to-flute-conversion)
+  - [Jianpu Auto Importer](#jianpu-auto-importer)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [Interactive Mode](#interactive-mode)
   - [List Available Songs](#list-available-songs)
   - [Play a Song](#play-a-song)
-    - [Advanced: Choosing a Conversion Strategy](#advanced-choosing-a-conversion-strategy)
+  - [Analyze a Song](#analyze-a-song)
   - [Importing a Song from an Image (Experimental)](#importing-a-song-from-an-image-experimental)
 - [Song File Format](#song-file-format)
 - [Project Structure](#project-structure)
@@ -49,21 +52,30 @@ Here's a quick look at how the tool translates a song for the Animal Well flute:
 - **Jianpu to Direction Conversion**: Automatically converts songs written in Jianpu into the game's 8-directional input sequence.
 - **Song Library**: Manage a local library of songs defined in simple `.yaml` files.
 - **CLI Player**: "Plays" songs in the terminal, displaying the sequence of directional inputs with timing.
+- **Jianpu Auto Importer(Experimental)**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format. Typically, only minor modifications are needed to make the song playable. **Only support Gemini-2.5 and Doubao Seed 1.6 now.**
 - **Extensible**: Easily add new songs by creating new `.yaml` files.
+- **Interactive TUI**: A user-friendly text-based interface for easy navigation and operation.
 
-### Coming Soon
+### TODO List
 
-- [x] **Expanded Song Library**: More pre-converted songs will be added to the library. Community contributions for new songs are highly encouraged!
-- [x] **Jianpu Auto Importer(Experimental)**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format. Typically, only minor modifications are needed to make the song playable. **Only support Gemini and Doubao now.**
-- [ ] **GUI Support**: A simple interactive interface that allows users to select songs and set parameters.
+- [x] ~~**Expanded Song Library**: More pre-converted songs will be added to the library. Community contributions for new songs are highly encouraged!~~
+- [x] ~~**Jianpu Auto Importer**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format.~~
+- [x] ~~**Interactive TUI**: A text-based user interface for selecting songs and functions is available via `python cli.py interactive`.~~
+- [ ] **Full GUI Support**: A graphical user interface for a more visual experience.
 
 ## How It Works
 
-The flute in *Animal Well* is played using 8 directions on a controller, corresponding to the 8 notes of a C Major scale. This tool works by mapping the provided Jianpu notation to these in-game directions.
+### Jianpu to Flute Conversion
 
-1.  **Parse**: It reads the `jianpu` list from a `.yaml` song file.
-2.  **Convert**: It translates each Jianpu symbol (e.g., `5`, `h1`, `(3 2)`) into its corresponding directional input, applying any necessary transposition based on the chosen strategy.
-3.  **Play**: It displays the final directional sequence in the command line, providing a clear guide for in-game performance.
+The flute in *Animal Well* is played using 8 directions on a controller, corresponding to the 8 notes of a C Major scale. The game also allows for pitch modification: holding the button that corresponds to note `1` while playing another note lowers its pitch by an octave, and holding the button for note `3` raises it by a semitone. This tool works by mapping the provided Jianpu notation to these in-game directional inputs, including the necessary holds for pitch shifting.
+
+-   **Parse**: It reads the `jianpu` list from a `.yaml` song file.
+-   **Convert**: It translates each Jianpu symbol (e.g., `5`, `h1`, `(3 2)`) into its corresponding directional input, applying any necessary transposition based on the chosen strategy.
+-   **Play**: It displays the final directional sequence in the command line, providing a clear guide for in-game performance.
+
+### Jianpu Auto Importer
+
+This feature leverages a **multimodal large language model (MLLM)** to provide an end-to-end solution for converting Jianpu images directly into the project's `.yaml` song format. The MLLM handles the entire process seamlessly: it analyzes the image, recognizes the musical notation, and generates the final, structured `.yaml` content, automating the transcription process from start to finish.
 
 ## Installation
 
@@ -86,6 +98,15 @@ The flute in *Animal Well* is played using 8 directions on a controller, corresp
 
 The tool is operated via `cli.py`.
 
+### Interactive Mode
+
+For a more user-friendly experience, you can run the tool in interactive mode. This provides a text-based user interface (TUI) to navigate through all available functions.
+
+To start the interactive mode, run:
+```bash
+python cli.py interactive
+```
+
 ### List Available Songs
 
 To see all the songs currently in your `songs/` directory:
@@ -96,13 +117,27 @@ python cli.py list
 
 ### Play a Song
 
-To "play" a song from your library, use the `play` command followed by the song's name (without the `.yaml` extension).
+To "play" a song from your library, use the `play` command followed by the song's name. If you omit the song name, the tool will enter an interactive selection menu.
 
 ```bash
+# Play a specific song
 python cli.py play travelers
+
+# Enter interactive mode to select a song
+python cli.py play --interactive
 ```
 
 This will output the directional sequence to your terminal.
+
+**Additional Parameters:**
+
+- `--bpm <number>`: Override the song's default BPM.
+- `--ready-time <seconds>`: Set a custom countdown time before playing (in seconds).
+
+**Example:**
+```bash
+python cli.py play travelers --bpm 100 --ready-time 5
+```
 
 #### Advanced: Choosing a Conversion Strategy
 
@@ -149,6 +184,19 @@ If you wish to use the default offset in a specific song (if any):
 python cli.py play your_song --strategy manual song
 ```
 
+### Analyze a Song
+
+To analyze a song's musical properties, such as its note range and optimal transposition, use the `analyze` command. This is useful for understanding how a song will be converted before you play it.
+
+```bash
+# Analyze a specific song
+python cli.py analyze travelers
+
+# Enter interactive mode to select a song to analyze
+python cli.py analyze --interactive
+```
+The output will show the song's pitch range and provide suggestions for the best conversion strategies.
+
 ### Importing a Song from an Image (Experimental)
 
 This tool can use AI to recognize a Jianpu image and automatically convert it into the `.yaml` song format.
@@ -159,6 +207,8 @@ This feature requires an API key for either Google Gemini or Doubao. You must se
 
 -   **For Gemini**: `GOOGLE_API_KEY`
 -   **For Doubao**: `ARK_API_KEY`
+
+> **Note**: Please use `GOOGLE_API_KEY` for the Gemini service. This specific variable name is used to avoid conflicts with other tools, such as `gemini-cli`, which may use `GEMINI_API_KEY`.
 
 You can check the status of the AI services with:
 ```bash
@@ -175,19 +225,15 @@ python cli.py import path/to/your/song.png
 
 # Import all images from a directory (defaults to the 'sheets/' directory)
 python cli.py import
-# or
-python cli.py import path/to/your/sheets_folder/
 ```
 
+**Additional Parameters:**
+- `--ai-provider <gemini|doubao>`: Specify which AI service to use.
+- `--output-dir <path>`: Specify a custom output directory for the generated `.yaml` file.
+- `--debug`: Display detailed debugging information, including the raw response from the AI model. This is useful for troubleshooting.
+
 -   **Automatic Merging**: If a directory contains multiple images, the tool will treat them as pages of the same song and merge them into a single `.yaml` file. The images are processed in alphabetical order.
--   **Specify AI Provider**: You can choose which AI service to use (if both are configured).
-    ```bash
-    python cli.py import --ai-provider gemini
-    ```
--   **Specify Output Directory**: By default, new songs are saved in the `songs/` directory. You can change this with the `--output-dir` flag.
-    ```bash
-    python cli.py import --output-dir path/to/custom/songs/
-    ```
+
 **Note**: This is an experimental feature. The AI-generated `.yaml` file may require manual corrections for accuracy.
 
 ## Song File Format

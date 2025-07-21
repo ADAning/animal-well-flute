@@ -17,14 +17,17 @@ from src.utils.import_coordinator import ImportCoordinator
 from src.utils.result_display import ImportResultDisplay
 from src.config import get_app_config
 from src.tools import JianpuSheetImporter, ToolsConfig
+from src.ui import InteractiveManager, SongSelector
 import time
 from pathlib import Path
 import glob
 
 
-def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=None):
+def auto_play(
+    song_name, strategy_args=["optimal"], bpm=None, ready_time=None, interactive=False
+):
     """自动演奏功能"""
-    
+
     # 获取配置
     config = get_app_config()
 
@@ -34,14 +37,31 @@ def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=None):
     # 获取共享的歌曲管理器
     song_manager = get_song_manager(config.songs_dir)
 
+    # 交互式选择歌曲
+    if interactive or song_name is None:
+        ui_manager = InteractiveManager()
+        song_selector = SongSelector(song_manager)
+
+        ui_manager.show_welcome()
+        selected_song_key = song_selector.select_song_simple("🎵 选择要演奏的歌曲")
+
+        if selected_song_key is None:
+            ui_manager.show_info("演奏已取消")
+            return False
+
+        song_name = selected_song_key
+
     try:
         song = song_manager.get_song(song_name)
     except Exception as e:
         print(f"❌ 乐曲 '{song_name}' 不存在")
-        print(f"📋 可用乐曲: {', '.join(song_manager.list_songs())}")
+        song_names = song_manager.list_song_names()
+        print(f"📋 可用乐曲: {', '.join(song_names)}")
         return False
     final_bpm = bpm or song.bpm or config.default_bpm
-    final_ready_time = ready_time if ready_time is not None else config.default_ready_time
+    final_ready_time = (
+        ready_time if ready_time is not None else config.default_ready_time
+    )
 
     print(f"🎵 乐曲: {song.name}")
     print(f"📊 BPM: {final_bpm}")
@@ -153,14 +173,28 @@ def auto_play(song_name, strategy_args=["optimal"], bpm=None, ready_time=None):
         return False
 
 
-def analyze_song(song_name):
+def analyze_song(song_name, interactive=False):
     """分析乐曲"""
-    
+
     # 获取配置
     config = get_app_config()
 
     # 获取共享的歌曲管理器
     song_manager = get_song_manager(config.songs_dir)
+
+    # 交互式选择歌曲
+    if interactive or song_name is None:
+        ui_manager = InteractiveManager()
+        song_selector = SongSelector(song_manager)
+
+        ui_manager.show_welcome()
+        selected_song_key = song_selector.select_song_simple("🎼 选择要分析的歌曲")
+
+        if selected_song_key is None:
+            ui_manager.show_info("分析已取消")
+            return False
+
+        song_name = selected_song_key
 
     try:
         song = song_manager.get_song(song_name)
@@ -195,52 +229,56 @@ def analyze_song(song_name):
 
 def import_sheet(image_paths, ai_provider=None, output_dir=None, debug=False):
     """导入简谱图片功能"""
-    
+
     try:
         # 获取配置
         config = get_app_config()
-        
+
         # 设置日志
         setup_logging(config.log_level)
-        
+
         # 使用导入协调器处理整个流程
         coordinator = ImportCoordinator(
-            output_dir=Path(output_dir) if output_dir else config.songs_dir,
-            debug=debug
+            output_dir=Path(output_dir) if output_dir else config.songs_dir, debug=debug
         )
-        
+
         # 执行导入
         result = coordinator.coordinate_import(image_paths, ai_provider)
-        
+
         # 处理AI服务配置错误
-        if not result.success and result.error and "未配置任何AI服务提供商" in result.error:
+        if (
+            not result.success
+            and result.error
+            and "未配置任何AI服务提供商" in result.error
+        ):
             print("❌ 未配置任何AI服务提供商")
             print("请设置以下环境变量之一:")
-            if hasattr(result, 'provider_status'):
+            if hasattr(result, "provider_status"):
                 for provider, info in result.provider_status.items():
                     print(f"   {info['env_key']} - {info['name']}")
             return False
-        
+
         # 处理AI服务提供商不可用错误
         if not result.success and result.error and "不可用" in result.error:
             print(f"❌ {result.error}")
-            if hasattr(result, 'available_providers'):
+            if hasattr(result, "available_providers"):
                 print(f"可用的服务商: {', '.join(result.available_providers)}")
             return False
-        
+
         # 处理其他错误
         if not result.success:
             print(f"❌ {result.error}")
             return False
-        
+
         # 显示结果
         ImportResultDisplay.display_import_results(result, debug)
-        
+
         return (result.total_success + result.total_warnings) > 0
-    
+
     except Exception as e:
         print(f"\n💥 导入过程中发生未预期的异常: {e}")
         import traceback
+
         print(f"详细错误信息:\n{traceback.format_exc()}")
         return False
 
@@ -250,15 +288,15 @@ def check_ai_status():
     config = ToolsConfig()
     importer = JianpuSheetImporter(config)
     status = importer.get_provider_status()
-    
+
     print("🤖 AI服务提供商状态:")
     for provider, info in status.items():
-        status_icon = "✅" if info['valid'] else "❌"
-        config_icon = "🔑" if info['configured'] else "⚪"
+        status_icon = "✅" if info["valid"] else "❌"
+        config_icon = "🔑" if info["configured"] else "⚪"
         print(f"   {status_icon} {provider:8s} - {info['name']}")
         print(f"      {config_icon} 环境变量: {info['env_key']}")
         print(f"      📋 模型: {info['model']}")
-        if not info['configured']:
+        if not info["configured"]:
             print(f"         请设置环境变量 {info['env_key']}")
         print()
 
@@ -270,12 +308,56 @@ def list_songs():
     song_manager = get_song_manager(config.songs_dir)
 
     print("📋 可用乐曲:")
-    for song_key in sorted(song_manager.list_songs()):
+    songs_info = song_manager.list_songs_with_info()
+    for song_info in songs_info:
+        name = song_info["name"]
+        bpm = song_info["bpm"]
+        description = song_info["description"]
+        desc_text = f" - {description[:40]}..." if description else ""
+        print(f"   {name:<25} (BPM: {bpm}){desc_text}")
+
+
+def interactive_main_menu():
+    """交互式主菜单"""
+    ui_manager = InteractiveManager()
+
+    ui_manager.show_welcome("Animal Well 笛子自动演奏 - 交互式模式")
+
+    while True:
+        options = [
+            {"key": "play", "desc": "🎵 自动演奏歌曲"},
+            {"key": "analyze", "desc": "🎼 分析歌曲"},
+            {"key": "list", "desc": "📋 列出所有歌曲"},
+            {"key": "import", "desc": "📸 从图片导入简谱"},
+            {"key": "ai-status", "desc": "🤖 检查AI服务状态"},
+        ]
+
+        choice = ui_manager.show_menu("主菜单", options, show_quit=True)
+
+        if choice is None:
+            ui_manager.exit_gracefully()
+
         try:
-            song = song_manager.get_song(song_key)
-            print(f"   {song_key:20s} - {song.name} (BPM: {song.bpm})")
+            if choice == "play":
+                auto_play(None, interactive=True)
+            elif choice == "analyze":
+                analyze_song(None, interactive=True)
+            elif choice == "list":
+                list_songs()
+                ui_manager.pause()
+            elif choice == "import":
+                ui_manager.show_info("进入图片导入功能...")
+                # 这里可以添加交互式的导入功能
+                ui_manager.show_warning("交互式导入功能开发中，请使用命令行模式")
+                ui_manager.pause()
+            elif choice == "ai-status":
+                check_ai_status()
+                ui_manager.pause()
+        except KeyboardInterrupt:
+            ui_manager.show_info("\n操作已取消")
         except Exception as e:
-            print(f"   {song_key:20s} - ❌ 加载失败: {e}")
+            ui_manager.show_error(f"执行命令时发生错误: {e}")
+            ui_manager.pause()
 
 
 def main():
@@ -285,7 +367,9 @@ def main():
 
     # play 命令
     play_parser = subparsers.add_parser("play", help="自动演奏")
-    play_parser.add_argument("song", help="乐曲名称")
+    play_parser.add_argument(
+        "song", nargs="?", help="乐曲名称（可选，留空则进入交互式选择）"
+    )
     play_parser.add_argument(
         "--strategy",
         nargs="+",
@@ -293,20 +377,40 @@ def main():
         help="映射策略: auto high/low/optimal, manual <offset|song>, none (manual song 使用乐曲文件中的相对偏移量)",
     )
     play_parser.add_argument("--bpm", type=int, help="BPM (覆盖默认值)")
-    play_parser.add_argument("--ready-time", type=int, help="准备时间（默认从配置读取）")
+    play_parser.add_argument(
+        "--ready-time", type=int, help="准备时间（默认从配置读取）"
+    )
+    play_parser.add_argument(
+        "--interactive", "-i", action="store_true", help="使用交互式模式选择歌曲"
+    )
 
     # analyze 命令
     analyze_parser = subparsers.add_parser("analyze", help="分析乐曲")
-    analyze_parser.add_argument("song", help="乐曲名称")
+    analyze_parser.add_argument(
+        "song", nargs="?", help="乐曲名称（可选，留空则进入交互式选择）"
+    )
+    analyze_parser.add_argument(
+        "--interactive", "-i", action="store_true", help="使用交互式模式选择歌曲"
+    )
 
     # import 命令
     import_parser = subparsers.add_parser("import", help="从图片导入简谱")
-    import_parser.add_argument("name", nargs="?", default="sheets", 
-                              help="图片文件、目录名或文件夹路径 (默认: sheets/) - 同一文件夹中的图片自动合并为一首歌")
-    import_parser.add_argument("--ai-provider", choices=["gemini", "doubao"], 
-                              help="指定AI服务提供商")
+    import_parser.add_argument(
+        "name",
+        nargs="?",
+        default="sheets",
+        help="图片文件、目录名或文件夹路径 (默认: sheets/) - 同一文件夹中的图片自动合并为一首歌",
+    )
+    import_parser.add_argument(
+        "--ai-provider", choices=["gemini", "doubao"], help="指定AI服务提供商"
+    )
     import_parser.add_argument("--output-dir", help="输出目录（默认从配置读取）")
-    import_parser.add_argument("--debug", action="store_true", help="显示详细的AI响应信息")
+    import_parser.add_argument(
+        "--debug", action="store_true", help="显示详细的AI响应信息"
+    )
+    import_parser.add_argument(
+        "--interactive", "-i", action="store_true", help="使用交互式模式选择文件和选项"
+    )
 
     # ai-status 命令
     ai_status_parser = subparsers.add_parser("ai-status", help="检查AI服务状态")
@@ -314,20 +418,52 @@ def main():
     # list 命令
     list_parser = subparsers.add_parser("list", help="列出可用乐曲")
 
+    # interactive 命令
+    interactive_parser = subparsers.add_parser("interactive", help="进入交互式主菜单")
+
     args = parser.parse_args()
 
     if args.command == "play":
-        auto_play(args.song, args.strategy, args.bpm, args.ready_time)
+        auto_play(args.song, args.strategy, args.bpm, args.ready_time, args.interactive)
     elif args.command == "analyze":
-        analyze_song(args.song)
+        analyze_song(args.song, args.interactive)
     elif args.command == "import":
-        import_sheet([args.name], args.ai_provider, args.output_dir, args.debug)
+        if args.interactive:
+            # 目前交互式导入功能开发中，显示提示信息
+            ui_manager = InteractiveManager()
+            ui_manager.show_welcome()
+            ui_manager.show_warning("交互式导入功能开发中")
+            ui_manager.show_info("请使用命令行模式: python cli.py import [path]")
+            ui_manager.show_info(
+                "例如: python cli.py import sheets/ --ai-provider gemini"
+            )
+        else:
+            import_sheet([args.name], args.ai_provider, args.output_dir, args.debug)
     elif args.command == "ai-status":
         check_ai_status()
     elif args.command == "list":
         list_songs()
+    elif args.command == "interactive":
+        interactive_main_menu()
     else:
+        # 没有指定命令时，显示帮助信息并询问是否进入交互式模式
         parser.print_help()
+        print("\n" + "=" * 50)
+        print("💡 提示：您可以使用以下方式:")
+        print("   - 直接使用命令行参数（如上所示）")
+        print("   - 运行 'python cli.py interactive' 进入交互式模式")
+        print("   - 运行 'python cli.py play --interactive' 交互式选择歌曲")
+
+        try:
+            from rich.prompt import Confirm
+
+            if Confirm.ask("\n是否现在进入交互式模式？", default=False):
+                interactive_main_menu()
+        except ImportError:
+            # 如果rich不可用，回退到简单提示
+            pass
+        except KeyboardInterrupt:
+            print("\n再见！")
 
 
 if __name__ == "__main__":
