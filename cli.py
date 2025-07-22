@@ -18,6 +18,7 @@ from src.utils.result_display import ImportResultDisplay
 from src.config import get_app_config
 from src.tools import JianpuSheetImporter, ToolsConfig
 from src.ui import InteractiveManager, SongSelector
+from src.services import SongServiceBase
 import time
 from pathlib import Path
 import glob
@@ -28,42 +29,28 @@ def auto_play(
 ):
     """自动演奏功能"""
 
-    # 获取配置
-    config = get_app_config()
-
-    # 设置日志
-    setup_logging(config.log_level)
-
-    # 获取共享的歌曲管理器
-    song_manager = get_song_manager(config.songs_dir)
+    # 使用统一的歌曲服务
+    service = SongServiceBase()
 
     # 交互式选择歌曲
-    if interactive or song_name is None:
-        ui_manager = InteractiveManager()
-        song_selector = SongSelector(song_manager)
-
-        ui_manager.show_welcome()
-        selected_song_key = song_selector.select_song_simple("🎵 选择要演奏的歌曲")
-
-        if selected_song_key is None:
-            ui_manager.show_info("演奏已取消")
-            return False
-
-        song_name = selected_song_key
-
-    try:
-        song = song_manager.get_song(song_name)
-    except Exception as e:
-        print(f"❌ 乐曲 '{song_name}' 不存在")
-        song_names = song_manager.list_song_names()
-        print(f"📋 可用乐曲: {', '.join(song_names)}")
-        return False
-    final_bpm = bpm or song.bpm or config.default_bpm
-    final_ready_time = (
-        ready_time if ready_time is not None else config.default_ready_time
+    song_name = service.get_song_by_name_or_interactive(
+        song_name, interactive, "🎵 选择要演奏的歌曲", for_playing=True
     )
 
-    print(f"🎵 乐曲: {song.name}")
+    if song_name is None:
+        return False
+
+    # 安全获取歌曲
+    success, song, error_msg = service.get_song_safely(song_name)
+    if not success:
+        print(error_msg)
+        return False
+    # 获取有效的参数值
+    final_bpm = service.get_effective_bpm(song, bpm)
+    final_ready_time = service.get_effective_ready_time(ready_time)
+
+    # 打印歌曲信息
+    service.print_song_info(song, song_name)
     print(f"📊 BPM: {final_bpm}")
 
     # 解析策略参数
@@ -176,31 +163,27 @@ def auto_play(
 def analyze_song(song_name, interactive=False):
     """分析乐曲"""
 
-    # 获取配置
-    config = get_app_config()
-
-    # 获取共享的歌曲管理器
-    song_manager = get_song_manager(config.songs_dir)
+    # 使用统一的歌曲服务
+    service = SongServiceBase()
 
     # 交互式选择歌曲
-    if interactive or song_name is None:
-        ui_manager = InteractiveManager()
-        song_selector = SongSelector(song_manager)
+    song_name = service.get_song_by_name_or_interactive(
+        song_name,
+        interactive,
+        "🎼 选择要分析的歌曲",
+        for_playing=False,
+        auto_select_unique=True,
+    )
 
-        ui_manager.show_welcome()
-        selected_song_key = song_selector.select_song_simple("🎼 选择要分析的歌曲")
-
-        if selected_song_key is None:
-            ui_manager.show_info("分析已取消")
-            return False
-
-        song_name = selected_song_key
-
-    try:
-        song = song_manager.get_song(song_name)
-    except Exception as e:
-        print(f"❌ 乐曲 '{song_name}' 不存在")
+    if song_name is None:
         return False
+
+    # 安全获取歌曲
+    success, song, error_msg = service.get_song_safely(song_name)
+    if not success:
+        print(error_msg)
+        return False
+
     print(f"🎵 分析乐曲: {song.name}")
 
     # 解析
@@ -302,144 +285,10 @@ def check_ai_status():
 
 
 def interactive_list_songs():
-    """交互式歌曲列表浏览功能 - 使用与analyze/play相同的动态选择界面"""
-    # 获取配置和组件
-    config = get_app_config()
-    song_manager = get_song_manager(config.songs_dir)
-    ui_manager = InteractiveManager()
-    song_selector = SongSelector(song_manager)
-
-    ui_manager.show_welcome("歌曲列表浏览")
-
-    while True:
-        options = [
-            {"key": "browse", "desc": "🎵 浏览和选择歌曲 (动态搜索)"},
-            {"key": "list", "desc": "📋 显示所有歌曲 (静态列表)"},
-        ]
-
-        choice = ui_manager.show_menu("歌曲浏览模式", options, show_quit=True)
-
-        if choice is None:
-            break
-
-        try:
-            if choice == "browse":
-                # 使用与analyze/play相同的动态选择界面
-                ui_manager.show_info("进入动态歌曲浏览模式...")
-                ui_manager.show_info(
-                    "💡 提示: 输入关键词可实时搜索，输入数字可直接选择"
-                )
-
-                # 使用SongSelector的select_song_simple方法，这与analyze/play使用的是同一个
-                selected_song = song_selector.select_song_simple(
-                    "🎵 浏览歌曲 (支持实时搜索)"
-                )
-
-                if selected_song:
-                    ui_manager.show_success(f"您选择了: {selected_song}")
-
-                    # 显示歌曲详细信息
-                    try:
-                        song = song_manager.get_song(selected_song)
-                        ui_manager.show_info(f"🎼 歌曲名称: {song.name}")
-                        ui_manager.show_info(f"🎵 BPM: {song.bpm}")
-                        if song.description:
-                            ui_manager.show_info(f"📝 描述: {song.description}")
-                        ui_manager.show_info(f"📊 小节数: {len(song.jianpu)}")
-
-                        # 询问是否要演奏
-                        if ui_manager.confirm("🎹 是否要演奏这首歌？", default=True):
-                            ui_manager.show_progress("准备演奏...")
-
-                            # 询问演奏参数
-                            play_options = [
-                                {"key": "default", "desc": "🎵 使用默认设置演奏"},
-                                {"key": "custom", "desc": "⚙️ 自定义演奏参数"},
-                            ]
-
-                            play_choice = ui_manager.show_menu(
-                                "演奏选项", play_options, show_quit=False
-                            )
-
-                            # 准备演奏参数
-                            strategy_args = ["optimal"]  # 默认策略
-                            bpm = None  # 使用歌曲默认BPM
-                            ready_time = None  # 使用配置默认准备时间
-
-                            if play_choice == "custom":
-                                # 自定义参数
-                                strategy_options = [
-                                    {"key": "optimal", "desc": "🎯 最佳策略 (推荐)"},
-                                    {"key": "high", "desc": "⬆️ 高音优先策略"},
-                                    {"key": "low", "desc": "⬇️ 低音优先策略"},
-                                ]
-
-                                strategy_choice = ui_manager.show_menu(
-                                    "选择演奏策略", strategy_options, show_quit=False
-                                )
-                                if strategy_choice:
-                                    strategy_args = [strategy_choice]
-
-                                # 可选的BPM设置
-                                custom_bpm = ui_manager.input_number(
-                                    f"自定义BPM (当前: {song.bpm}, 留空使用默认)",
-                                    default=None,
-                                    min_value=30,
-                                    max_value=300,
-                                )
-                                if custom_bpm:
-                                    bpm = int(custom_bpm)
-
-                                # 可选的准备时间
-                                custom_ready_time = ui_manager.input_number(
-                                    "准备时间(秒) (留空使用默认)",
-                                    default=None,
-                                    min_value=0,
-                                    max_value=30,
-                                )
-                                if custom_ready_time is not None:
-                                    ready_time = int(custom_ready_time)
-
-                            # 执行演奏
-                            ui_manager.show_info("🎼 开始演奏...")
-                            try:
-                                result = auto_play(
-                                    selected_song,
-                                    strategy_args,
-                                    bpm,
-                                    ready_time,
-                                    interactive=False,
-                                )
-                                if result:
-                                    ui_manager.show_success("🎉 演奏完成！")
-                                else:
-                                    ui_manager.show_warning("演奏未完成")
-                            except Exception as e:
-                                ui_manager.show_error(f"演奏时发生错误: {e}")
-                        else:
-                            ui_manager.show_info("已取消演奏")
-
-                    except Exception as e:
-                        ui_manager.show_warning(f"无法获取歌曲详细信息: {e}")
-                else:
-                    ui_manager.show_info("未选择歌曲")
-
-                ui_manager.pause()
-
-            elif choice == "list":
-                # 显示所有歌曲的静态列表
-                ui_manager.show_info("正在加载歌曲列表...")
-                song_selector.list_all_songs()
-                ui_manager.pause()
-
-        except KeyboardInterrupt:
-            ui_manager.show_info("\n操作已取消")
-            break
-        except Exception as e:
-            ui_manager.show_error(f"执行操作时发生错误: {e}")
-            ui_manager.pause()
-
-    ui_manager.exit_gracefully()
+    """交互式歌曲列表浏览功能 - 使用统一的服务"""
+    service = SongServiceBase()
+    service.set_play_callback(auto_play)
+    service.handle_interactive_list_songs()
 
 
 def list_songs(interactive=False):
@@ -448,18 +297,9 @@ def list_songs(interactive=False):
         interactive_list_songs()
         return
 
-    # 原有的非交互式实现
-    config = get_app_config()
-    song_manager = get_song_manager(config.songs_dir)
-
-    print("📋 可用乐曲:")
-    songs_info = song_manager.list_songs_with_info()
-    for song_info in songs_info:
-        name = song_info["name"]
-        bpm = song_info["bpm"]
-        description = song_info["description"]
-        desc_text = f" - {description[:40]}..." if description else ""
-        print(f"   {name:<25} (BPM: {bpm}){desc_text}")
+    # 使用统一的服务处理非交互式列表
+    service = SongServiceBase(setup_logging_level=False)  # 避免重复设置日志
+    service.list_all_songs_info()
 
 
 def interactive_main_menu():
@@ -494,10 +334,8 @@ def interactive_main_menu():
                 ui_manager.show_info("进入图片导入功能...")
                 # 这里可以添加交互式的导入功能
                 ui_manager.show_warning("交互式导入功能开发中，请使用命令行模式")
-                ui_manager.pause()
             elif choice == "ai-status":
                 check_ai_status()
-                ui_manager.pause()
         except KeyboardInterrupt:
             ui_manager.show_info("\n操作已取消")
         except Exception as e:

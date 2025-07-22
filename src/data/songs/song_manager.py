@@ -8,6 +8,7 @@ import re
 
 from .sample_songs import Song
 from .sample_songs import get_sample_songs
+from ..parsers import JianpuParser, TokenValidator
 from ...utils.exceptions import SongNotFoundError
 from ...utils.logger import get_logger
 
@@ -21,6 +22,10 @@ class SongManager:
         self.songs_dir = songs_dir or Path("songs")
         self.songs: Dict[str, Song] = {}  # key -> Song
         self.name_to_key: Dict[str, str] = {}  # name -> key 映射
+
+        # 初始化解析器
+        self.jianpu_parser = JianpuParser()
+
         self._load_songs()
 
     def _load_songs(self) -> None:
@@ -55,13 +60,15 @@ class SongManager:
                         logger.error(f"  - {error}")
                     continue
 
-                # 检测并处理不同的YAML格式
-                format_type = self._detect_yaml_format(data)
+                # 使用新的解析器处理不同的YAML格式
+                format_type = self.jianpu_parser.detect_jianpu_format(data)
 
                 if format_type == "string_based":
                     # 统一处理所有基于字符串的格式
                     logger.debug(f"Detected string-based format in {file_path}")
-                    data["jianpu"] = self._parse_unified_jianpu(data["jianpu"])
+                    data["jianpu"] = self.jianpu_parser.parse_unified_jianpu(
+                        data["jianpu"]
+                    )
                 elif format_type == "legacy":
                     # legacy格式直接使用，yaml.unsafe_load已经处理了Python类型
                     logger.debug(f"Detected legacy format in {file_path}")
@@ -236,271 +243,6 @@ class SongManager:
 
         logger.info(f"Saved song '{song.name}' to {file_path}")
 
-    def _parse_unified_jianpu(
-        self, jianpu_data: Union[List[List[str]], List[str]]
-    ) -> List[List[Any]]:
-        """统一解析字符串化和简化格式的简谱数据
-
-        Args:
-            jianpu_data: 简谱数据（字符串列表或嵌套字符串列表）
-
-        Returns:
-            解析后的简谱数据
-        """
-        parsed_jianpu = []
-
-        # 检查是否为字符串化格式（每小节一个字符串）
-        if jianpu_data and isinstance(jianpu_data[0], str):
-            # 字符串化格式：每小节一个字符串或多小节用|分割
-            for bar_str in jianpu_data:
-                # 检查是否包含|分割符
-                if "|" in bar_str:
-                    # 多小节用|分割
-                    sub_bars = bar_str.split("|")
-                    for sub_bar_str in sub_bars:
-                        sub_bar_str = sub_bar_str.strip()
-                        if sub_bar_str:  # 跳过空字符串
-                            parsed_bar = self._parse_bar_string(sub_bar_str)
-                            parsed_jianpu.append(parsed_bar)
-                else:
-                    # 单小节
-                    parsed_bar = self._parse_bar_string(bar_str)
-                    parsed_jianpu.append(parsed_bar)
-        else:
-            # 简化格式：嵌套列表，每个音符都是字符串
-            for bar in jianpu_data:
-                parsed_bar = []
-                for note in bar:
-                    if isinstance(note, str):
-                        parsed_bar.append(self._parse_note_token(note))
-                    else:
-                        parsed_bar.append(note)
-                parsed_jianpu.append(parsed_bar)
-
-        return parsed_jianpu
-
-    def _parse_bar_string(self, bar_str: str) -> List[Any]:
-        """解析小节字符串
-
-        Args:
-            bar_str: 小节字符串，如 "0 0 (0,3) (3,4)"
-
-        Returns:
-            解析后的小节数据
-        """
-        notes = []
-        tokens = self._tokenize_bar_string(bar_str)
-
-        for token in tokens:
-            notes.append(self._parse_note_token(token))
-
-        return notes
-
-    def _tokenize_bar_string(self, bar_str: str) -> List[str]:
-        """将小节字符串分词 - 按空格分割，保持括号完整性
-
-        Args:
-            bar_str: 小节字符串，如 "0 0 (0 3) (3 4)"
-
-        Returns:
-            分词后的列表，如 ["0", "0", "(0 3)", "(3 4)"]
-        """
-        tokens = []
-        current_token = ""
-        bracket_count = 0
-
-        for char in bar_str:
-            if char == "(":
-                bracket_count += 1
-                current_token += char
-            elif char == ")":
-                bracket_count -= 1
-                current_token += char
-            elif char.isspace() and bracket_count == 0:
-                # 只在括号外的空格处分割
-                if current_token.strip():
-                    tokens.append(current_token.strip())
-                    current_token = ""
-            else:
-                current_token += char
-
-        # 处理最后的token
-        if current_token.strip():
-            tokens.append(current_token.strip())
-
-        return tokens
-
-    def _parse_note_token(self, token: str) -> Any:
-        """统一的token解析器 - 处理所有类型的音符token
-
-        Args:
-            token: 音符token，如 "3", "(3 4)", "h1", "(l5 (1 2))" 等
-
-        Returns:
-            解析后的音符数据：数字、字符串或元组
-        """
-        return self._parse_token_recursive(token.strip())
-
-    def _parse_token_recursive(self, token: str) -> Any:
-        """递归解析token - 统一处理括号和基本token
-
-        Args:
-            token: 要解析的token
-
-        Returns:
-            解析后的数据
-        """
-        if not token:
-            return ""
-
-        # 处理括号表达式
-        if token.startswith("(") and token.endswith(")"):
-            inner = token[1:-1].strip()
-            if not inner:
-                return ()
-
-            # 智能分割并递归解析
-            parts = self._split_by_space_smart(inner)
-            parsed_parts = []
-
-            for part in parts:
-                part = part.strip()
-                if part:
-                    parsed_parts.append(self._parse_token_recursive(part))
-
-            # 返回适当的元组格式
-            return (
-                tuple(parsed_parts)
-                if len(parsed_parts) > 1
-                else (parsed_parts[0],) if parsed_parts else ()
-            )
-
-        # 处理基本token（数字或字符串）
-        return self._parse_basic_token(token)
-
-    def _parse_basic_token(self, token: str) -> Any:
-        """解析基本token - 数字或字符串
-
-        Args:
-            token: 基本token如 "3", "h1", "5d", "-" 等
-
-        Returns:
-            int, float 或 str
-        """
-        # 尝试解析为数字
-        try:
-            return float(token) if "." in token else int(token)
-        except ValueError:
-            # 不是数字，返回字符串
-            return token
-
-    def _detect_yaml_format(self, data: Dict) -> str:
-        """检测YAML文件的格式类型
-
-        Args:
-            data: 从YAML文件加载的数据
-
-        Returns:
-            格式类型：'string_based', 'legacy', 'unknown'
-        """
-        if "jianpu" not in data:
-            return "unknown"
-
-        jianpu = data["jianpu"]
-        if not isinstance(jianpu, list) or not jianpu:
-            return "unknown"
-
-        # 检查是否为字符串化格式（每小节一个字符串）
-        if jianpu and isinstance(jianpu[0], str):
-            return "string_based"
-
-        # 检查是否为简化格式（嵌套列表，每个音符都是字符串）
-        if isinstance(jianpu[0], list):
-            # 检查前几个音符是否都是字符串
-            sample_notes = []
-            for bar in jianpu[:2]:  # 检查前2个小节
-                if isinstance(bar, list):
-                    sample_notes.extend(bar[:3])  # 每小节取前3个音符
-
-            # 如果样本音符都是字符串，认为是string_based格式
-            if sample_notes and all(isinstance(note, str) for note in sample_notes):
-                return "string_based"
-
-        # 默认返回legacy格式
-        return "legacy"
-
-    def _convert_to_simplified_format(self, jianpu: List[List[Any]]) -> List[str]:
-        """将简谱数据转换为字符串化格式
-
-        Args:
-            jianpu: 原始简谱数据
-
-        Returns:
-            字符串化格式的简谱数据（每小节一个字符串）
-        """
-        simplified_jianpu = []
-
-        for bar in jianpu:
-            bar_notes = []
-            for note in bar:
-                bar_notes.append(self._note_to_string(note, "unified"))
-            simplified_jianpu.append(" ".join(bar_notes))
-
-        return simplified_jianpu
-
-    def _note_to_string(self, note: Any, format_style: str = "unified") -> str:
-        """将音符转换为字符串格式
-
-        Args:
-            note: 音符数据（可以是字符串、数字、元组等）
-            format_style: 格式化风格 ("unified" 或 "legacy")
-
-        Returns:
-            字符串格式的音符
-        """
-        if isinstance(note, str):
-            if format_style == "unified":
-                # 统一格式：简单音符不需要括号，复杂的加括号
-                if (
-                    note in ["-", "0"]
-                    or note.isdigit()
-                    or any(c in note for c in ["h", "l", "d"])
-                ):
-                    return note
-                else:
-                    return f"({note})"
-            else:
-                return note
-
-        elif isinstance(note, (int, float)):
-            return str(note)
-
-        elif isinstance(note, tuple):
-            # 递归转换每个元素
-            parts = [self._note_to_string(part, format_style) for part in note]
-
-            if format_style == "unified":
-                # 统一格式：所有元组都用括号包围，用逗号分隔
-                return f"({','.join(parts)})"
-            else:
-                # 传统格式：保持原有逻辑
-                if len(parts) == 1:
-                    return f"({parts[0]})"
-
-                # 如果元组中包含其他元组，需要使用括号
-                if any(" " in part and "(" in part for part in parts):
-                    formatted_parts = []
-                    for part in parts:
-                        if " " in part and "(" in part:
-                            formatted_parts.append(f"({part})")
-                        else:
-                            formatted_parts.append(part)
-                    return " ".join(formatted_parts)
-                else:
-                    return " ".join(parts)
-        else:
-            return str(note)
-
     def save_song_simplified(self, song: Song, file_path: Path) -> None:
         """保存乐曲为字符串化格式的YAML文件
 
@@ -508,8 +250,8 @@ class SongManager:
             song: 乐曲对象
             file_path: 文件路径
         """
-        # 转换为字符串化格式
-        stringified_jianpu = self._convert_to_simplified_format(song.jianpu)
+        # 使用新的解析器转换为字符串化格式
+        stringified_jianpu = self.jianpu_parser.convert_to_string_format(song.jianpu)
 
         data = {
             "name": song.name,
@@ -637,7 +379,7 @@ class SongManager:
                 with open(file_path, "r", encoding="utf-8") as f:
                     # 对于legacy格式，使用unsafe_load来处理Python类型
                     data = yaml.unsafe_load(f)
-                    format_type = self._detect_yaml_format(data)
+                    format_type = self.jianpu_parser.detect_jianpu_format(data)
                     format_info["format_types"][format_type] += 1
                     format_info["external_songs"] += 1
             except:
@@ -730,9 +472,11 @@ class SongManager:
                             continue  # 跳过空的子小节
 
                         try:
-                            tokens = self._tokenize_bar_string(sub_bar_str)
+                            from ..parsers.token_parser import TokenParser
+
+                            tokens = TokenParser.tokenize_bar_string(sub_bar_str)
                             for j, token in enumerate(tokens):
-                                if not self._is_valid_note_token(token):
+                                if not TokenParser.is_valid_note_token(token):
                                     errors.append(
                                         f"Bar {i+1}.{k+1}, Note {j+1}: Invalid token '{token}'"
                                     )
@@ -741,9 +485,11 @@ class SongManager:
                 else:
                     # 单小节
                     try:
-                        tokens = self._tokenize_bar_string(bar_str)
+                        from ..parsers.token_parser import TokenParser
+
+                        tokens = TokenParser.tokenize_bar_string(bar_str)
                         for j, token in enumerate(tokens):
-                            if not self._is_valid_note_token(token):
+                            if not TokenParser.is_valid_note_token(token):
                                 errors.append(
                                     f"Bar {i+1}, Note {j+1}: Invalid token '{token}'"
                                 )
@@ -766,151 +512,6 @@ class SongManager:
 
         return errors
 
-    def _is_valid_note_token(self, token: str) -> bool:
-        """检查音符token是否有效
-
-        Args:
-            token: 音符token
-
-        Returns:
-            是否有效
-        """
-        token = token.strip()
-        if not token:
-            return False
-
-        # 递归验证token结构
-        return self._validate_token_structure(token)
-
-    def _validate_token_structure(self, token: str) -> bool:
-        """递归验证token结构
-
-        Args:
-            token: 要验证的token
-
-        Returns:
-            是否有效
-        """
-        token = token.strip()
-
-        # 如果不是括号格式，验证基本token
-        if not token.startswith("(") or not token.endswith(")"):
-            return self._is_valid_basic_token(token)
-
-        # 验证括号平衡
-        if not self._is_balanced_parentheses(token):
-            return False
-
-        # 去掉外层括号
-        inner = token[1:-1]
-        if not inner:
-            return True  # 空括号是有效的
-
-        # 分割并递归验证每个部分
-        try:
-            parts = self._split_by_space_smart(inner)
-            for part in parts:
-                part = part.strip()
-                if part and not self._validate_token_structure(part):
-                    return False
-            return True
-        except:
-            return False
-
-    def _is_valid_basic_token(self, token: str) -> bool:
-        """验证基本token（非括号格式）
-
-        Args:
-            token: 基本token
-
-        Returns:
-            是否有效
-        """
-        token = token.strip()
-
-        # 简单音符：数字、浮点数、休止符、特殊标记
-        if (
-            token.isdigit()
-            or token in ["-", "0"]
-            or any(c in token for c in ["h", "l", "d"])
-        ):
-            return True
-
-        # 检查是否为浮点数（半音）
-        try:
-            float(token)
-            return True
-        except ValueError:
-            pass
-
-        # 检查是否为有效的音符字符串格式
-        import re
-
-        valid_patterns = [
-            r"^[lh]?\d+(\.\d+)?d?$",  # 标准音符格式，如 l1, h2, 1.5d
-            r"^-+$",  # 延长音符号
-            r"^0+$",  # 休止符
-        ]
-
-        for pattern in valid_patterns:
-            if re.match(pattern, token):
-                return True
-
-        return False
-
-    def _is_balanced_parentheses(self, token: str) -> bool:
-        """检查括号是否平衡
-
-        Args:
-            token: 要检查的字符串
-
-        Returns:
-            括号是否平衡
-        """
-        count = 0
-        for char in token:
-            if char == "(":
-                count += 1
-            elif char == ")":
-                count -= 1
-                if count < 0:
-                    return False
-        return count == 0
-
-    def _split_by_space_smart(self, text: str) -> List[str]:
-        """智能按空格分割，考虑括号嵌套
-
-        Args:
-            text: 要分割的文本
-
-        Returns:
-            分割后的部分列表
-        """
-        parts = []
-        current_part = ""
-        bracket_count = 0
-
-        for char in text:
-            if char == "(":
-                bracket_count += 1
-                current_part += char
-            elif char == ")":
-                bracket_count -= 1
-                current_part += char
-            elif char == " " and bracket_count == 0:
-                # 只在顶级空格处分割
-                if current_part.strip():
-                    parts.append(current_part.strip())
-                current_part = ""
-            else:
-                current_part += char
-
-        # 添加最后一部分
-        if current_part.strip():
-            parts.append(current_part.strip())
-
-        return parts
-
     def _validate_note(self, note: Any, bar_num: int, note_num: int) -> List[str]:
         """验证单个音符的格式
 
@@ -927,7 +528,7 @@ class SongManager:
 
         # 简化格式验证（字符串格式）
         if isinstance(note, str):
-            if not self._is_valid_note_string(note):
+            if not TokenValidator.is_valid_note_string(note):
                 errors.append(f"{position}: Invalid note string format '{note}'")
 
         # Legacy格式验证（元组、数字、字符串）
@@ -944,35 +545,6 @@ class SongManager:
             errors.append(f"{position}: Unsupported note type {type(note)}")
 
         return errors
-
-    def _is_valid_note_string(self, note_str: str) -> bool:
-        """检查音符字符串是否有效
-
-        Args:
-            note_str: 音符字符串
-
-        Returns:
-            是否有效
-        """
-        # 允许的基本音符格式
-        valid_patterns = [
-            r"^-$",  # 休止符
-            r"^\d+$",  # 数字音符
-            r"^\d+\.\d+$",  # 浮点数音符（半音）
-            r"^[lh]\d+$",  # 低音(l)或高音(h)
-            r"^[lh]\d+\.\d+$",  # 低音/高音的浮点数
-            r"^\d+d$",  # 带d的音符
-            r"^\d+\.\d+d$",  # 带d的浮点数音符
-            r"^[\d\. ()lh-]+$",  # 复合格式（空格、括号等，包含小数点）
-        ]
-
-        import re
-
-        for pattern in valid_patterns:
-            if re.match(pattern, note_str):
-                return True
-
-        return False
 
     def _is_valid_note_number(self, note_num: Union[int, float]) -> bool:
         """检查音符数字是否有效

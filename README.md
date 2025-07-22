@@ -40,6 +40,7 @@ Here's a quick look at how the tool translates a song for the Animal Well flute:
   - [Interactive Mode](#interactive-mode)
   - [List Available Songs](#list-available-songs)
   - [Play a Song](#play-a-song)
+    - [Advanced: Choosing a Conversion Strategy](#advanced-choosing-a-conversion-strategy)
   - [Analyze a Song](#analyze-a-song)
   - [Importing a Song from an Image (Experimental)](#importing-a-song-from-an-image-experimental)
 - [Song File Format](#song-file-format)

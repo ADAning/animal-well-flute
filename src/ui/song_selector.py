@@ -154,8 +154,19 @@ class SongSelector:
 
         return matching_songs
 
-    def select_song_simple(self, prompt_text: str = "选择歌曲") -> Optional[str]:
-        """简单的歌曲选择界面 - 使用序号选择（与analyze/play相同的动态搜索）"""
+    def select_song_simple(
+        self,
+        prompt_text: str = "选择歌曲",
+        for_playing: bool = False,
+        auto_confirm: bool = False,
+    ) -> Optional[str]:
+        """简单的歌曲选择界面 - 使用序号选择（与analyze/play相同的动态搜索）
+
+        Args:
+            prompt_text: 提示文本
+            for_playing: 是否用于演奏目的（影响单首歌匹配时的询问文本）
+            auto_confirm: 是否自动确认唯一匹配结果（不询问用户）
+        """
         if not self.songs:
             self.console.print("[red]❌ 没有可用的歌曲[/red]")
             return None
@@ -190,12 +201,21 @@ class SongSelector:
 
             # 获取用户选择
             if len(filtered_songs) == 1:
-                # 只有一个结果，询问是否选择
+                # 只有一个结果
                 self.console.print(
                     f"\n[cyan]找到唯一匹配: {filtered_songs[0].name}[/cyan]"
                 )
+
+                # 如果设置了自动确认，直接返回结果
+                if auto_confirm:
+                    return filtered_songs[0].name
+
+                # 否则询问是否选择或演奏
                 try:
-                    confirm = prompt("选择这首歌? (y/n): ").lower().strip()
+                    if for_playing:
+                        confirm = prompt("是否要现在演奏? (y/n): ").lower().strip()
+                    else:
+                        confirm = prompt("选择这首歌? (y/n): ").lower().strip()
                     if confirm in ["y", "yes", "是", ""]:
                         return filtered_songs[0].name
                 except KeyboardInterrupt:
@@ -342,35 +362,56 @@ class SongSelector:
         except Exception:
             return None
 
-    def list_all_songs(self):
+    def list_all_songs(self) -> Optional[str]:
         """列出所有歌曲 - 支持翻页浏览（直接按键响应）"""
         if not self.songs:
             self.console.print("[red]❌ 没有可用的歌曲[/red]")
-            return
+            return None
 
         import sys
-        import tty
-        import termios
 
         current_page = 0
         page_size = 20
         total_pages = (len(self.songs) - 1) // page_size + 1
 
         def get_single_char():
-            """获取单个字符输入（不需要回车）"""
+            """获取单个字符输入（不需要回车）- 跨平台兼容"""
             if sys.platform == "win32":
-                import msvcrt
-
-                return msvcrt.getch().decode("utf-8").lower()
-            else:
-                fd = sys.stdin.fileno()
-                old_settings = termios.tcgetattr(fd)
                 try:
-                    tty.cbreak(fd)
-                    char = sys.stdin.read(1).lower()
-                finally:
-                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-                return char
+                    import msvcrt
+
+                    # Windows: 使用msvcrt.getch()获取单字符
+                    while True:
+                        if msvcrt.kbhit():
+                            char = msvcrt.getch()
+                            if isinstance(char, bytes):
+                                try:
+                                    return char.decode("utf-8").lower()
+                                except UnicodeDecodeError:
+                                    # 处理特殊键如方向键
+                                    if char == b"\xe0":  # 扩展键前缀
+                                        msvcrt.getch()  # 读取后续字符
+                                    continue
+                            return char.lower()
+                except ImportError:
+                    return None
+            else:
+                try:
+                    import tty
+                    import termios
+
+                    # Unix系统: 使用termios/tty
+                    fd = sys.stdin.fileno()
+                    old_settings = termios.tcgetattr(fd)
+                    try:
+                        tty.cbreak(fd)
+                        char = sys.stdin.read(1).lower()
+                        return char
+                    finally:
+                        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                except (ImportError, OSError, AttributeError):
+                    return None
+            return None
 
         while True:
             # 清屏并显示当前页
@@ -385,6 +426,7 @@ class SongSelector:
                 nav_tips.append("[cyan]p[/cyan] 上一页")
             if current_page < total_pages - 1:
                 nav_tips.append("[cyan]n[/cyan] 下一页")
+            nav_tips.append("[cyan]s[/cyan] 选择歌曲")
             nav_tips.append("[cyan]q[/cyan] 退出")
 
             self.console.print(f"\n[dim]导航: {' | '.join(nav_tips)}[/dim]")
@@ -394,26 +436,15 @@ class SongSelector:
                 # 获取单个字符
                 char = get_single_char()
 
-                if char == "q":
-                    break
-                elif char == "p" and current_page > 0:
-                    current_page -= 1
-                elif char == "n" and current_page < total_pages - 1:
-                    current_page += 1
-                elif char == "\x03":  # Ctrl+C
-                    break
-                # 忽略其他按键
-
-            except KeyboardInterrupt:
-                break
-            except Exception:
-                # 如果直接按键不可用，回退到传统方式
-                self.console.print(
-                    "\n[yellow]直接按键不可用，使用传统输入模式[/yellow]"
-                )
-                try:
+                if char is None:
+                    # 如果直接按键不可用，回退到传统方式
+                    self.console.print(
+                        "\n[yellow]直接按键不可用，使用传统输入模式[/yellow]"
+                    )
                     choice = (
-                        prompt("请输入 p(上一页)/n(下一页)/q(退出): ").strip().lower()
+                        prompt("请输入 p(上一页)/n(下一页)/s(选择歌曲)/q(退出): ")
+                        .strip()
+                        .lower()
                     )
                     if choice == "q":
                         break
@@ -421,8 +452,82 @@ class SongSelector:
                         current_page -= 1
                     elif choice == "n" and current_page < total_pages - 1:
                         current_page += 1
+                    elif choice == "s":
+                        return self._select_song_from_list(current_page, page_size)
+                    continue
+
+                if char == "q":
+                    break
+                elif char == "p" and current_page > 0:
+                    current_page -= 1
+                elif char == "n" and current_page < total_pages - 1:
+                    current_page += 1
+                elif char == "s":
+                    return self._select_song_from_list(current_page, page_size)
+                elif char == "\x03":  # Ctrl+C
+                    break
+                # 忽略其他按键
+
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                # 处理其他异常，回退到传统方式
+                self.console.print(
+                    f"\n[yellow]按键输入出错 ({str(e)})，使用传统输入模式[/yellow]"
+                )
+                try:
+                    choice = (
+                        prompt("请输入 p(上一页)/n(下一页)/s(选择歌曲)/q(退出): ")
+                        .strip()
+                        .lower()
+                    )
+                    if choice == "q":
+                        break
+                    elif choice == "p" and current_page > 0:
+                        current_page -= 1
+                    elif choice == "n" and current_page < total_pages - 1:
+                        current_page += 1
+                    elif choice == "s":
+                        return self._select_song_from_list(current_page, page_size)
                 except KeyboardInterrupt:
                     break
+
+        return None
+
+    def _select_song_from_list(
+        self, current_page: int, page_size: int
+    ) -> Optional[str]:
+        """从当前页面选择歌曲"""
+        start_idx = current_page * page_size
+        end_idx = min(start_idx + page_size, len(self.songs))
+        page_songs = self.songs[start_idx:end_idx]
+
+        self.console.print("\n[cyan]请选择歌曲:[/cyan]")
+        try:
+            choice = (
+                prompt(f"请输入歌曲序号 (1-{len(page_songs)}) 或 'c' 取消: ")
+                .strip()
+                .lower()
+            )
+
+            if choice == "c":
+                return None
+
+            try:
+                index = int(choice) - 1
+                if 0 <= index < len(page_songs):
+                    selected_song = page_songs[index]
+                    self.console.print(f"\n[green]已选择: {selected_song.name}[/green]")
+                    return selected_song.name
+                else:
+                    self.console.print("[red]❌ 无效的序号[/red]")
+                    return None
+            except ValueError:
+                self.console.print("[red]❌ 请输入有效的数字[/red]")
+                return None
+
+        except KeyboardInterrupt:
+            return None
 
     def search_and_display(self, query: str):
         """搜索并显示结果"""
