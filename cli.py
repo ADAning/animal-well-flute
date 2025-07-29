@@ -407,6 +407,9 @@ def main():
     # interactive 命令
     interactive_parser = subparsers.add_parser("interactive", help="进入交互式主菜单")
 
+    # tui 命令
+    tui_parser = subparsers.add_parser("tui", help="启动现代TUI界面 (Cosmic Edition)")
+
     args = parser.parse_args()
 
     if args.command == "play":
@@ -431,19 +434,45 @@ def main():
         list_songs(args.interactive)
     elif args.command == "interactive":
         interactive_main_menu()
+    elif args.command == "tui":
+        # Launch the TUI interface
+        try:
+            from src.tui.app import run_tui
+            return run_tui()
+        except ImportError as e:
+            print("❌ TUI界面需要额外依赖，请运行: pip install textual")
+            print(f"详细错误: {e}")
+            return 1
+        except Exception as e:
+            print(f"❌ 启动TUI界面时发生错误: {e}")
+            return 1
     else:
         # 没有指定命令时，显示帮助信息并询问是否进入交互式模式
         parser.print_help()
         print("\n" + "=" * 50)
         print("💡 提示：您可以使用以下方式:")
         print("   - 直接使用命令行参数（如上所示）")
-        print("   - 运行 'python cli.py interactive' 进入交互式模式")
+        print("   - 运行 'python cli.py tui' 启动现代TUI界面 (推荐)")
+        print("   - 运行 'python cli.py interactive' 进入交互式主菜单")
         print("   - 运行 'python cli.py play --interactive' 交互式选择歌曲")
 
         try:
             from rich.prompt import Confirm
 
-            if Confirm.ask("\n是否现在进入交互式模式？", default=False):
+            # Ask if user wants to launch TUI first
+            if Confirm.ask("\n是否启动现代TUI界面？", default=True):
+                try:
+                    from src.tui.app import run_tui
+                    return run_tui()
+                except ImportError:
+                    print("❌ TUI需要textual依赖，请运行: pip install textual")
+                    if Confirm.ask("是否进入传统交互式模式？", default=True):
+                        interactive_main_menu()
+                except Exception as e:
+                    print(f"❌ TUI启动失败: {e}")
+                    if Confirm.ask("是否进入传统交互式模式？", default=True):
+                        interactive_main_menu()
+            elif Confirm.ask("是否进入传统交互式模式？", default=False):
                 interactive_main_menu()
         except ImportError:
             # 如果rich不可用，回退到简单提示
