@@ -62,7 +62,8 @@ Here's a quick look at how the tool translates a song for the Animal Well flute:
 - [x] ~~**Expanded Song Library**: More pre-converted songs will be added to the library. Community contributions for new songs are highly encouraged!~~
 - [x] ~~**Jianpu Auto Importer**: This feature parses an image of a numbered jianpu, converting it into the project's standard .yaml song format.~~
 - [x] ~~**Interactive TUI**: A text-based user interface for selecting songs and functions is available via `python cli.py interactive`.~~
-- [ ] **Full GUI Support**: A graphical user interface for a more visual experience.
+- [ ] ~~**Full GUI Support(Abort)**: A graphical user interface for a more visual experience.~~
+- [ ] **Full Terminal User Interface(TUI) Support(WIP)**: A complete and beautiful interactive TUI, which has the same function as the GUI but is more attractive.
 
 ## How It Works
 
