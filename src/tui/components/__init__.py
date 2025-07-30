@@ -1,6 +1,8 @@
-"""TUI Components for Animal Well Flute"""
+"""TUI 组件模块"""
 
-from .header import AppHeader
-from .footer import AppFooter
+from .song_browser import SongBrowser
+from .play_control import PlayControl
+from .analysis_panel import AnalysisPanel
+from .settings_panel import SettingsPanel
 
-__all__ = ["AppHeader", "AppFooter"]
+__all__ = ["SongBrowser", "PlayControl", "AnalysisPanel", "SettingsPanel"]

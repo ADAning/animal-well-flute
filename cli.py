@@ -302,6 +302,45 @@ def list_songs(interactive=False):
     service.list_all_songs_info()
 
 
+def launch_gui(no_fallback=False):
+    """启动GUI模式 (TUI)"""
+    try:
+        # 尝试导入并启动TUI
+        from src.tui import run_tui_app
+        
+        print("🚀 启动 Animal Well Flute TUI 界面...")
+        run_tui_app()
+        
+    except ImportError as e:
+        if "textual" in str(e).lower():
+            print("❌ TUI模式不可用: 缺少 textual 依赖")
+            print("请运行: pip install textual>=0.44.0")
+        else:
+            print(f"❌ TUI模式不可用: 导入错误 - {e}")
+        
+        if not no_fallback:
+            print("\n🔄 回退到交互式模式...")
+            try:
+                import time
+                time.sleep(1)  # 给用户时间阅读消息
+                interactive_main_menu()
+            except Exception as fallback_error:
+                print(f"回退到交互式模式也失败: {fallback_error}")
+                print("请使用基本命令行模式")
+        
+    except Exception as e:
+        print(f"❌ 启动TUI失败: {e}")
+        if not no_fallback:
+            print("\n🔄 回退到交互式模式...")
+            try:
+                import time
+                time.sleep(1)
+                interactive_main_menu()
+            except Exception as fallback_error:
+                print(f"回退到交互式模式也失败: {fallback_error}")
+                print("请使用基本命令行模式")
+
+
 def interactive_main_menu():
     """交互式主菜单"""
     ui_manager = InteractiveManager()
@@ -315,6 +354,7 @@ def interactive_main_menu():
             {"key": "list", "desc": "📋 列出所有歌曲"},
             {"key": "import", "desc": "📸 从图片导入简谱"},
             {"key": "ai-status", "desc": "🤖 检查AI服务状态"},
+            {"key": "gui", "desc": "🖥️ 启动TUI界面"},
         ]
 
         choice = ui_manager.show_menu("主菜单", options, show_quit=True)
@@ -336,6 +376,9 @@ def interactive_main_menu():
                 ui_manager.show_warning("交互式导入功能开发中，请使用命令行模式")
             elif choice == "ai-status":
                 check_ai_status()
+            elif choice == "gui":
+                ui_manager.show_info("正在启动TUI界面...")
+                launch_gui(no_fallback=True)
         except KeyboardInterrupt:
             ui_manager.show_info("\n操作已取消")
         except Exception as e:
@@ -407,10 +450,23 @@ def main():
     # interactive 命令
     interactive_parser = subparsers.add_parser("interactive", help="进入交互式主菜单")
 
-    # tui 命令
-    tui_parser = subparsers.add_parser("tui", help="启动现代TUI界面 (Cosmic Edition)")
+    # gui 命令 (TUI模式)
+    gui_parser = subparsers.add_parser("gui", help="启动图形用户界面 (TUI)")
+    gui_parser.add_argument(
+        "--no-fallback", action="store_true", help="如果TUI不可用，不回退到交互式模式"
+    )
+
+    # 全局参数
+    parser.add_argument(
+        "--gui", action="store_true", help="启动图形用户界面 (TUI)"
+    )
 
     args = parser.parse_args()
+
+    # 检查是否启动 GUI 模式
+    if args.command == "gui" or getattr(args, 'gui', False):
+        launch_gui(getattr(args, 'no_fallback', False))
+        return
 
     if args.command == "play":
         auto_play(args.song, args.strategy, args.bpm, args.ready_time, args.interactive)
@@ -434,49 +490,37 @@ def main():
         list_songs(args.interactive)
     elif args.command == "interactive":
         interactive_main_menu()
-    elif args.command == "tui":
-        # Launch the TUI interface
-        try:
-            from src.tui.app import run_tui
-            return run_tui()
-        except ImportError as e:
-            print("❌ TUI界面需要额外依赖，请运行: pip install textual")
-            print(f"详细错误: {e}")
-            return 1
-        except Exception as e:
-            print(f"❌ 启动TUI界面时发生错误: {e}")
-            return 1
     else:
         # 没有指定命令时，显示帮助信息并询问是否进入交互式模式
         parser.print_help()
         print("\n" + "=" * 50)
         print("💡 提示：您可以使用以下方式:")
         print("   - 直接使用命令行参数（如上所示）")
-        print("   - 运行 'python cli.py tui' 启动现代TUI界面 (推荐)")
-        print("   - 运行 'python cli.py interactive' 进入交互式主菜单")
+        print("   - 运行 'python cli.py gui' 启动TUI图形界面")
+        print("   - 运行 'python cli.py interactive' 进入交互式模式")
         print("   - 运行 'python cli.py play --interactive' 交互式选择歌曲")
+        print("   - 添加 --gui 参数到任何命令启动TUI界面")
 
         try:
             from rich.prompt import Confirm
+            from rich.console import Console
+            console = Console()
 
-            # Ask if user wants to launch TUI first
-            if Confirm.ask("\n是否启动现代TUI界面？", default=True):
-                try:
-                    from src.tui.app import run_tui
-                    return run_tui()
-                except ImportError:
-                    print("❌ TUI需要textual依赖，请运行: pip install textual")
-                    if Confirm.ask("是否进入传统交互式模式？", default=True):
-                        interactive_main_menu()
-                except Exception as e:
-                    print(f"❌ TUI启动失败: {e}")
-                    if Confirm.ask("是否进入传统交互式模式？", default=True):
-                        interactive_main_menu()
-            elif Confirm.ask("是否进入传统交互式模式？", default=False):
+            console.print("\n[cyan]选择启动模式:[/cyan]")
+            if Confirm.ask("是否启动TUI图形界面？", default=True):
+                launch_gui(no_fallback=False)
+            elif Confirm.ask("是否进入交互式模式？", default=False):
                 interactive_main_menu()
         except ImportError:
             # 如果rich不可用，回退到简单提示
-            pass
+            try:
+                choice = input("\n启动模式: [G]UI界面 / [I]nteractive交互式 / [Q]uit退出? (G): ").lower().strip() or "g"
+                if choice.startswith("g"):
+                    launch_gui(no_fallback=False)
+                elif choice.startswith("i"):
+                    interactive_main_menu()
+            except KeyboardInterrupt:
+                print("\n再见！")
         except KeyboardInterrupt:
             print("\n再见！")
 

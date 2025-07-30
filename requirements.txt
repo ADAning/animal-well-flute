@@ -5,7 +5,9 @@ rich>=13.0.0
 prompt_toolkit>=3.0.0
 pydantic>=2.0.0
 PyYAML>=6.0
-textual>=0.41.0
+
+# TUI 界面依赖
+textual>=0.44.0
 
 # 简谱图片导入功能依赖
 Pillow>=9.0.0

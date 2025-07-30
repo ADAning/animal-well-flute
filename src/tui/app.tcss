@@ -1,0 +1,476 @@
+/* Animal Well Flute TUI 样式文件 */
+
+/* 全局样式 */
+Screen {
+    background: $background;
+}
+
+/* 主容器样式 */
+#dashboard_content {
+    padding: 1 2;
+    height: 1fr;
+}
+
+Container {
+    height: auto;
+}
+
+/* 欢迎文本样式 */
+#welcome {
+    text-align: center;
+    margin: 1 0;
+    content-align: center middle;
+    height: 3;
+    color: $primary;
+    text-style: bold;
+    background: $surface;
+    border: solid $primary;
+}
+
+/* 按钮行布局 */
+.button_row {
+    height: 3;
+    margin: 1 0;
+    align: center middle;
+}
+
+.button_row Button {
+    margin: 0 1;
+    min-width: 12;
+}
+
+/* 状态显示样式 */
+#current_song_display, #play_status_display {
+    margin: 1 0;
+    padding: 1;
+    background: $surface;
+    border: solid $accent;
+    text-align: center;
+    height: 3;
+    content-align: center middle;
+}
+
+#current_song_display {
+    color: $warning;
+    text-style: bold;
+}
+
+#play_status_display {
+    color: $success;
+    text-style: bold;
+}
+
+/* 标签页内容样式 */
+TabPane {
+    padding: 1;
+}
+
+/* 占位符样式 */
+#song_browser, #play_control, #analysis_panel, #settings_panel {
+    text-align: center;
+    content-align: center middle;
+    color: $warning;
+    background: $surface;
+    border: dashed $warning;
+    height: 80%;
+    margin: 2;
+}
+
+/* 按钮样式增强 */
+Button {
+    text-style: bold;
+}
+
+Button:hover {
+    text-style: bold;
+    background: $accent;
+}
+
+Button.-primary {
+    background: $primary;
+}
+
+Button.-primary:hover {
+    background: $primary-darken-1;
+}
+
+/* 响应式设计 - Textual CSS 不支持 media queries，移除此部分 */
+
+/* Header 和 Footer 增强 */
+Header {
+    dock: top;
+    height: 3;
+}
+
+Footer {
+    dock: bottom;
+    height: 1;
+}
+
+/* TabbedContent 样式 */
+TabbedContent {
+    height: 1fr;
+}
+
+ContentTabs {
+    height: 3;
+}
+
+/* 通知样式 */
+Notification {
+    background: $boost;
+    color: $text;
+    border: solid $primary;
+}
+
+/* 滚动条样式 - Textual 使用不同的滚动条语法 */
+Scrollbar {
+    background: $surface;
+}
+
+ScrollbarThumb {
+    background: $primary;
+}
+
+/* 深色主题特定样式 */
+Screen.-dark-mode #welcome {
+    background: $surface-darken-1;
+    border: solid $primary-lighten-1;
+    color: $primary-lighten-1;
+}
+
+/* 浅色主题特定样式 */
+Screen.-light-mode #welcome {
+    background: $surface-lighten-1;
+    border: solid $primary-darken-1;
+    color: $primary-darken-1;
+}
+
+/* 歌曲浏览器组件样式 */
+SongBrowser {
+    height: 1fr;
+}
+
+#browser_header {
+    height: 6;
+    padding: 1;
+    background: $surface;
+    border: solid $accent;
+}
+
+.search_row {
+    height: 3;
+    align: center middle;
+}
+
+.search_label {
+    width: 8;
+    text-align: right;
+    content-align: center middle;
+    color: $text;
+}
+
+#search_input {
+    width: 1fr;
+    margin: 0 1;
+}
+
+#refresh_btn {
+    width: 8;
+}
+
+.action_row {
+    height: 3;
+    align: center middle;
+    margin-top: 1;
+}
+
+.action_row Button {
+    margin: 0 1;
+    width: 10;
+}
+
+#songs_table {
+    height: 1fr;
+    margin: 1 0;
+}
+
+#status_bar {
+    height: 1;
+    background: $surface;
+    color: $accent;
+    text-align: center;
+    content-align: center middle;
+}
+
+/* 播放控制组件样式 */
+PlayControl {
+    height: 1fr;
+    padding: 1;
+}
+
+#current_song_info {
+    height: 8;
+    background: $surface;
+    border: solid $primary;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+#song_title {
+    height: 1;
+    text-style: bold;
+    color: $primary;
+}
+
+#play_progress {
+    height: 1;
+    margin: 1 0;
+}
+
+#play_status_text {
+    height: 1;
+    color: $success;
+}
+
+#play_controls {
+    height: 4;
+    background: $surface;
+    border: solid $accent;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+.control_row {
+    height: 3;
+    align: center middle;
+}
+
+.control_row Button {
+    margin: 0 1;
+    width: 8;
+}
+
+#play_settings {
+    height: 4;
+    background: $surface;
+    border: solid $accent;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+.settings_row {
+    height: 3;
+    align: center middle;
+}
+
+.setting_label {
+    width: 10;
+    text-align: right;
+    content-align: center middle;
+    color: $text;
+}
+
+.number_input {
+    width: 8;
+    margin: 0 1;
+}
+
+#strategy_settings {
+    height: 6;
+    background: $surface;
+    border: solid $accent;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+#strategy_select {
+    width: 20;
+    margin: 0 1;
+}
+
+#manual_offset_input {
+    width: 15;
+    margin: 0 1;
+}
+
+#song_analysis {
+    height: 6;
+    background: $surface;
+    border: solid $warning;
+    padding: 1;
+}
+
+#range_info, #mapping_info {
+    height: 1;
+    color: $text;
+    margin: 1 0;
+}
+
+/* 分析面板组件样式 */
+AnalysisPanel {
+    height: 1fr;
+    padding: 1;
+}
+
+#analysis_header {
+    height: 4;
+    background: $surface;
+    border: solid $primary;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+.song_select_row {
+    height: 3;
+    align: center middle;
+}
+
+.song_select_row .label {
+    width: 6;
+    text-align: right;
+    content-align: center middle;
+    color: $text;
+}
+
+.song_select_row Input {
+    width: 1fr;
+    margin: 0 1;
+}
+
+.song_select_row Button {
+    width: 10;
+}
+
+#basic_info, #range_analysis, #mapping_suggestions, #detailed_analysis {
+    background: $surface;
+    border: solid $accent;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+#basic_info {
+    height: 4;
+}
+
+#range_analysis {
+    height: 4;
+}
+
+#mapping_suggestions {
+    height: 8;
+}
+
+#detailed_analysis {
+    height: 8;
+}
+
+.section_title {
+    text-style: bold;
+    color: $primary;
+    height: 1;
+    margin: 0 0 1 0;
+}
+
+.info_row, .range_row {
+    height: 3;
+    align: center middle;
+}
+
+.info_row Static, .range_row Static {
+    width: 1fr;
+    text-align: center;
+    content-align: center middle;
+    background: $surface-darken-1;
+    border: solid $accent;
+    margin: 0 1;
+}
+
+#strategy_table {
+    height: 1fr;
+}
+
+#analysis_details {
+    height: 1fr;
+    color: $text;
+    background: $surface-darken-1;
+    padding: 1;
+    border: solid $accent;
+}
+
+/* 设置面板组件样式 */
+SettingsPanel {
+    height: 1fr;
+    padding: 1;
+}
+
+#appearance_settings, #playback_settings, #advanced_settings, #settings_actions, #settings_info {
+    background: $surface;
+    border: solid $accent;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+#appearance_settings {
+    height: 8;
+}
+
+#playback_settings {
+    height: 6;
+}
+
+#advanced_settings {
+    height: 4;
+}
+
+#settings_actions {
+    height: 4;
+}
+
+#settings_info {
+    height: 3;
+}
+
+.subsection_title {
+    text-style: bold;
+    color: $accent;
+    height: 1;
+    margin: 0 0 1 0;
+}
+
+.setting_row, .action_row {
+    height: 3;
+    align: center middle;
+    margin: 0 0 1 0;
+}
+
+.setting_row .setting_label {
+    width: 15;
+    text-align: right;
+    content-align: center middle;
+    color: $text;
+}
+
+.setting_row Switch, .setting_row Select, .setting_row Input {
+    width: 20;
+    margin: 0 1;
+}
+
+.path_input {
+    width: 1fr;
+}
+
+.action_row Button {
+    margin: 0 1;
+    width: 15;
+}
+
+#settings_status {
+    height: 1fr;
+    color: $text;
+    background: $surface-darken-1;
+    padding: 1;
+    border: solid $accent;
+    text-align: center;
+    content-align: center middle;
+}
