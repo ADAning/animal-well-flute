@@ -7,7 +7,10 @@ from textual.reactive import reactive
 from textual.message import Message
 from typing import Optional, Dict
 
-from ...config import get_app_config
+from ...config import get_app_config, save_app_config
+from ...utils.logger import setup_logging, get_logger
+
+logger = get_logger(__name__)
 
 
 class SettingsPanel(Container):
@@ -132,18 +135,44 @@ class SettingsPanel(Container):
     def _save_settings(self) -> None:
         """保存设置"""
         try:
+            status = self.query_one("#settings_status", Static)
+            status.update("💾 正在保存...")
+            
+            # 获取所有输入值
+            songs_dir_input = self.query_one("#songs_dir_input", Input)
+            songs_dir = songs_dir_input.value.strip() or "songs"
+            
+            # 更新配置对象
+            self.config.log_level = self.log_level
+            self.config.songs_dir = songs_dir
+            
+            # 保存配置到文件
+            config_data = {
+                "log_level": self.log_level,
+                "songs_dir": songs_dir,
+                "default_bpm": self.default_bpm,
+                "default_ready_time": self.default_ready_time,
+                "ui": {
+                    "dark_mode": self.dark_mode
+                }
+            }
+            
+            save_app_config(config_data)
+            
             # 应用深色模式设置
             if hasattr(self.app, 'dark'):
                 self.app.dark = self.dark_mode
+                
+            # 应用日志级别设置
+            setup_logging(self.log_level, tui_mode=True)
 
-            # 更新状态
-            status = self.query_one("#settings_status", Static)
-            status.update("✅ 设置已保存")
+            status.update("✅ 设置已保存并应用")
             
             # 发送设置变更消息
-            self.post_message(self.SettingsChanged("theme", "dark" if self.dark_mode else "light"))
+            self.post_message(self.SettingsChanged("all", config_data))
             
         except Exception as e:
+            logger.error(f"Failed to save settings: {e}")
             status = self.query_one("#settings_status", Static)
             status.update(f"❌ 保存失败: {str(e)}")
 
@@ -166,19 +195,24 @@ class SettingsPanel(Container):
         import sys
         
         try:
-            config_path = "config.json"  # 假设的配置文件路径
+            config_path = self.config.config_file
+            
+            # 如果配置文件不存在，先创建一个
+            if not config_path.exists():
+                self.config.save_config()
             
             if sys.platform == "win32":
-                os.startfile(config_path)
+                os.startfile(str(config_path))
             elif sys.platform == "darwin":
-                subprocess.run(["open", config_path])
+                subprocess.run(["open", str(config_path)])
             else:
-                subprocess.run(["xdg-open", config_path])
+                subprocess.run(["xdg-open", str(config_path)])
             
             status = self.query_one("#settings_status", Static)
-            status.update("📁 已打开配置文件")
+            status.update(f"📁 已打开配置文件: {config_path.name}")
             
         except Exception as e:
+            logger.error(f"Failed to open config file: {e}")
             status = self.query_one("#settings_status", Static)
             status.update(f"❌ 打开失败: {str(e)}")
 

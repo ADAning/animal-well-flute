@@ -149,13 +149,34 @@ Screen.-light-mode #welcome {
 /* 歌曲浏览器组件样式 */
 SongBrowser {
     height: 1fr;
+    padding: 0;
+    margin: 0;
+}
+
+/* 定义空状态背景图案 */
+$empty-hatch: right $surface-lighten-1 70%;
+
+/* 统一的浏览器区域 - 类似Postman的分割布局 */
+#unified_browser_area {
+    height: 1fr;
+    background: $surface;
+    border: round $accent;
+    padding: 0;
+    margin: 0;
 }
 
 #browser_header {
-    height: 6;
-    padding: 1;
+    height: 3;
+    padding: 0;
     background: $surface;
-    border: round $accent;
+}
+
+/* 分割线样式 - 类似Postman界面 */
+#browser_separator {
+    height: 1;
+    color: $accent;
+    margin: 0;
+    background: $surface;
 }
 
 .search_row {
@@ -164,19 +185,23 @@ SongBrowser {
 }
 
 .search_label {
+    height: 3;
     width: 8;
-    text-align: right;
     content-align: center middle;
     color: $text;
+    margin: 0 1;
 }
 
 #search_input {
     width: 1fr;
-    margin: 0 1;
+    height: 3;
 }
 
 #refresh_btn {
+    height: 3;
     width: 8;
+    margin: 0 1;
+    align: center middle;
 }
 
 .action_row {
@@ -190,9 +215,35 @@ SongBrowser {
     width: 10;
 }
 
+#songs_container {
+    height: 1fr;
+    margin: 0;
+    padding: 1;
+    background: $surface;
+}
+
 #songs_table {
     height: 1fr;
-    margin: 1 0;
+    border: none;
+    background: $surface;
+    margin: 0;
+    padding: 0;
+}
+
+/* 空状态样式 */
+#songs_container #empty-message {
+    hatch: $empty-hatch;
+    color: $text-muted;
+    display: none;
+}
+
+#songs_container.empty {
+    #songs_table {
+        display: none;
+    }
+    #empty-message {
+        display: block;
+    }
 }
 
 #status_bar {
@@ -209,26 +260,19 @@ PlayControl {
     padding: 1;
 }
 
-#current_song_info {
-    height: 8;
-    background: $surface;
-    border: round $primary;
-    padding: 1;
-    margin: 0 0 1 0;
-}
-
-#song_title {
+/* 合并面板内的组件样式 */
+#combined_info #song_title {
     height: 1;
     text-style: bold;
     color: $primary;
 }
 
-#play_progress {
+#combined_info #play_progress {
     height: 1;
     margin: 1 0;
 }
 
-#play_status_text {
+#combined_info #play_status_text {
     height: 1;
     color: $success;
 }
@@ -271,7 +315,8 @@ PlayControl {
 }
 
 .setting_label {
-    width: 8;
+    height: 3;
+    width: 10;
     text-align: right;
     content-align: center middle;
     color: $text;
@@ -279,18 +324,28 @@ PlayControl {
 }
 
 .number_input {
-    width: 8;
+    width: 9;
     margin: 0 1;
+    height: 3;
+    content-align: center middle;
+}
+
+.ready_time_input {
+    height: 3;
 }
 
 .strategy_select {
     width: 12;
     margin: 0 1;
+    height: 3;
+    content-align: center middle;
 }
 
 .manual_offset {
     width: 20;
     margin: 0 1;
+    height: 3;
+    content-align: center middle;
 }
 
 # 保留旧样式以防兼容性问题
@@ -324,11 +379,15 @@ PlayControl {
 #strategy_select {
     width: 20;
     margin: 0 1;
+    height: 3;
+    content-align: center middle;
 }
 
 #manual_offset_input {
     width: 15;
     margin: 0 1;
+    height: 3;
+    content-align: center middle;
 }
 
 #song_analysis {
@@ -344,27 +403,104 @@ PlayControl {
     margin: 0 0 1 0;
 }
 
-/* 实时播放信息面板样式 */
-#realtime_info {
-    height: 6;
-    background: $surface;
-    border: round $success;
-    padding: 1;
-    margin: 0 0 1 0;
+/* Section 类样式 - 用于带边框标题的容器 */
+.section {
+    border: round $accent 40%;
+    border-title-color: $text-accent 80%;
+    border-title-align: left;
+    border-title-style: bold;
+
+    &:focus-within {
+        border: round $accent 100%;
+        border-title-color: $foreground;
+        border-title-style: bold;
+    }
 }
 
-.realtime_row {
+/* 合并的当前歌曲状态面板样式 */
+#combined_info.section {
+    height: 15;
+    background: $surface;
+    border: round $accent 60%;
+    border-title-color: $accent;
+    border-title-align: left;
+    border-title-style: bold;
+    padding: 1;
+    margin: 0 0 1 0;
+
+    &:focus-within {
+        border: round $primary 100%;
+        border-title-color: $text-primary;
+        border-title-style: bold;
+    }
+}
+
+/* Postman样式的状态指示器 */
+#combined_info.status-playing {
+    border: round $success 80%;
+    border-title-color: $success;
+}
+
+#combined_info.status-paused {
+    border: round $warning 80%;
+    border-title-color: $warning;
+}
+
+#combined_info.status-loading {
+    border: round $primary 80%;
+    border-title-color: $primary;
+}
+
+#combined_info.status-error {
+    border: round $error 80%;
+    border-title-color: $error;
+}
+
+#combined_info.status-stopped {
+    border: round $surface-lighten-1 60%;
+    border-title-color: $text-muted;
+}
+
+/* 播放控制专用样式 */
+#play_controls.section {
+    border: round $accent 60%;
+    border-title-color: $accent;
+    border-title-align: left;
+    border-title-style: bold;
+
+    &:focus-within {
+        border: round $accent 100%;
+        border-title-color: $text-accent;
+        border-title-style: bold;
+    }
+}
+
+/* 播放参数专用样式 */
+#unified_settings.section {
+    border: round $accent 60%;
+    border-title-color: $accent;
+    border-title-align: left;
+    border-title-style: bold;
+
+    &:focus-within {
+        border: round $accent 100%;
+        border-title-color: $text-accent;
+        border-title-style: bold;
+    }
+}
+
+#combined_info .realtime_row {
     height: 2;
     align: center middle;
     margin: 0;
 }
 
-.realtime_row Static {
+#combined_info .realtime_row Static {
     width: 1fr;
     text-align: center;
     content-align: center middle;
     background: $surface-darken-1;
-    border: round $success;
+    border: round $primary;
     margin: 0 1;
     color: $text;
     padding: 0 1;
@@ -391,52 +527,91 @@ AnalysisPanel {
     padding: 1;
 }
 
-#analysis_header {
-    height: 4;
+/* 分析控制面板 - 类似Postman的请求构建区域 */
+#analysis_control.section {
+    height: 6;
     background: $surface;
-    border: round $primary;
+    border: round $accent 60%;
+    border-title-color: $accent;
+    border-title-align: left;
+    border-title-style: bold;
     padding: 1;
     margin: 0 0 1 0;
+    
+    &:focus-within {
+        border: round $primary 100%;
+        border-title-color: $text-primary;
+        border-title-style: bold;
+    }
 }
 
 .song_select_row {
     height: 3;
     align: center middle;
+    margin: 0 0 1 0;
 }
 
-.song_select_row .label {
-    width: 6;
-    text-align: right;
-    content-align: center middle;
-    color: $text;
+.status_row {
+    height: 2;
+    align: center middle;
 }
 
 .song_select_row Input {
     width: 1fr;
     margin: 0 1;
+    height: 3;
 }
 
 .song_select_row Button {
     width: 10;
+    height: 3;
 }
 
-#basic_info, #range_analysis, #mapping_suggestions, #detailed_analysis {
+#analysis_status_display {
+    width: 1fr;
+    height: 2;
+    content-align: left middle;
+    color: $text;
+    margin: 0 1 0 0;
+}
+
+#analysis_progress {
+    width: 1fr;
+    height: 2;
+    margin: 0;
+}
+
+/* 信息面板样式 - 使用section类 */
+#basic_info.section, #range_analysis.section, #mapping_suggestions.section, #detailed_analysis.section {
     background: $surface;
-    border: round $accent;
+    border: round $accent 60%;
+    border-title-color: $accent;
+    border-title-align: left;
+    border-title-style: bold;
     padding: 1;
     margin: 0 0 1 0;
+    
+    &:focus-within {
+        border: round $accent 100%;
+        border-title-color: $text-accent;
+        border-title-style: bold;
+    }
 }
 
 #basic_info {
-    height: 4;
+    height: 5;
 }
 
 #range_analysis {
-    height: 4;
+    height: 5;
 }
 
 #mapping_suggestions {
     height: 8;
+}
+
+#detailed_analysis {
+    height: 4;
 }
 
 /* 移除detailed_analysis容器，使用直接样式 */
@@ -449,17 +624,20 @@ AnalysisPanel {
 }
 
 .info_row, .range_row {
-    height: 3;
+    height: 2;
     align: center middle;
+    margin: 0 0 1 0;
 }
 
 .info_row Static, .range_row Static {
     width: 1fr;
+    height: 2;
     text-align: center;
     content-align: center middle;
     background: $surface-darken-1;
     border: round $accent;
     margin: 0 1;
+    color: $text;
 }
 
 #strategy_table {
@@ -548,6 +726,154 @@ SettingsPanel {
     background: $surface-darken-1;
     padding: 1;
     border: round $accent;
+    text-align: center;
+    content-align: center middle;
+}
+
+/* 图片导入对话框样式 */
+ImageImportDialog {
+    align: center middle;
+}
+
+#import_dialog {
+    width: 80;
+    height: 24;
+    border: thick $primary 80%;
+    background: $surface;
+}
+
+#dialog_title {
+    dock: top;
+    height: 1;
+    text-align: center;
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+#file_selection {
+    height: 6;
+    border: round $accent;
+    margin: 1 0;
+    padding: 1;
+}
+
+#import_options {
+    height: 4;
+    border: round $accent;
+    margin: 1 0;
+    padding: 1;
+}
+
+#import_progress {
+    height: 6;
+    border: round $accent;
+    margin: 1 0;
+    padding: 1;
+}
+
+#dialog_buttons {
+    dock: bottom;
+    height: 3;
+    text-align: center;
+    content-align: center middle;
+}
+
+.button_row {
+    height: 3;
+    align: center middle;
+}
+
+.file_row {
+    height: 3;
+    align: center middle;
+}
+
+.option_row {
+    height: 2;
+    align: center middle;
+    margin: 0 0 1 0;
+}
+
+.option_label {
+    width: 15;
+    text-align: right;
+    content-align: center middle;
+    color: $text;
+}
+
+/* 歌曲详情对话框样式 */
+SongDetailsDialog {
+    align: center middle;
+}
+
+#details_dialog {
+    width: 90;
+    height: 30;
+    border: thick $primary 80%;
+    background: $surface;
+}
+
+#dialog_title {
+    dock: top;
+    height: 1;
+    text-align: center;
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+#details_tabs {
+    height: 1fr;
+    margin: 1;
+}
+
+.tab_content {
+    height: 1fr;
+    padding: 1;
+}
+
+.info_section {
+    border: round $accent 60%;
+    border-title-color: $accent;
+    border-title-align: left;
+    border-title-style: bold;
+    background: $surface;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+#song_metadata {
+    height: 8;
+}
+
+#song_description {
+    height: 6;
+}
+
+#file_info {
+    height: 5;
+}
+
+#jianpu_display {
+    height: 1fr;
+}
+
+#range_info {
+    height: 6;
+}
+
+#mapping_info {
+    height: 1fr;
+}
+
+#description_scroll, #jianpu_scroll, #mapping_scroll {
+    height: 1fr;
+}
+
+#dialog_buttons {
+    dock: bottom;
+    height: 3;
     text-align: center;
     content-align: center middle;
 }

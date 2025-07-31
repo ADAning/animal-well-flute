@@ -1,15 +1,25 @@
 """分析面板组件"""
 
-from textual.widgets import Button, Static, Input, DataTable, Select
-from textual.containers import Container, Horizontal
+from textual.widgets import Button, Static, Input, DataTable, Select, ProgressBar
+from textual.containers import Container, Horizontal, Vertical
 from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.message import Message
 from typing import Optional, Dict, List
+from enum import Enum
 
 from ...services.song_service_base import SongServiceBase
 from ...core.parser import RelativeParser
 from ...core.converter import AutoConverter
+from ...data.songs.song_manager import SongManager
+
+
+class AnalysisStatus(Enum):
+    """分析状态枚举"""
+    IDLE = "idle"
+    ANALYZING = "analyzing"
+    COMPLETED = "completed"
+    ERROR = "error"
 
 
 class AnalysisPanel(Container):
@@ -26,6 +36,7 @@ class AnalysisPanel(Container):
     # 响应式属性
     current_song: reactive[Optional[str]] = reactive(None)
     analysis_data: reactive[Optional[Dict]] = reactive(None)
+    analysis_status: reactive[AnalysisStatus] = reactive(AnalysisStatus.IDLE)
 
     def __init__(self, song_service: SongServiceBase):
         """初始化分析面板组件"""
@@ -33,41 +44,54 @@ class AnalysisPanel(Container):
         self.song_service = song_service
         self.parser = RelativeParser()
         self.converter = AutoConverter()
+        self.song_manager = SongManager()
 
     def compose(self) -> ComposeResult:
         """构建组件界面"""
-        # 歌曲选择和分析控制
-        with Container(id="analysis_header"):
+        # 歌曲选择控制面板 - 类似Postman的请求构建区域
+        with Container(id="analysis_control", classes="section") as control_container:
+            control_container.border_title = "🎵 歌曲分析"
             with Horizontal(classes="song_select_row"):
-                yield Static("歌曲:", classes="label")
-                yield Input(placeholder="输入歌曲名称", id="song_input")
+                yield Static("歌曲:", classes="setting_label")
+                yield Input(placeholder="输入歌曲名称或从浏览器选择", id="song_input")
                 yield Button("🔍 分析", id="analyze_btn", variant="primary")
+            
+            # 分析状态和进度显示
+            with Horizontal(classes="status_row"):
+                yield Static("状态: 等待分析", id="analysis_status_display")
+                yield ProgressBar(total=100, show_percentage=False, id="analysis_progress")
 
-        # 基本信息显示
-        with Container(id="basic_info"):
-            yield Static("基本信息", classes="section_title")
-            with Horizontal(classes="info_row"):
-                yield Static("歌曲名称: 未选择", id="song_name_info")
-                yield Static("BPM: -", id="bpm_info")
-                yield Static("小节数: -", id="bars_info")
+        # 基本信息面板 - 使用border_title替代内部标题
+        with Container(id="basic_info", classes="section") as basic_container:
+            basic_container.border_title = "📊 基本信息"
+            with Vertical():
+                with Horizontal(classes="info_row"):
+                    yield Static("歌曲名称: 未选择", id="song_name_info")
+                    yield Static("BPM: -", id="bpm_info")
+                with Horizontal(classes="info_row"):
+                    yield Static("小节数: -", id="bars_info")
+                    yield Static("总时长: -", id="duration_info")
 
-        # 音域分析
-        with Container(id="range_analysis"):
-            yield Static("音域分析", classes="section_title")
-            with Horizontal(classes="range_row"):
-                yield Static("最低音: -", id="min_note")
-                yield Static("最高音: -", id="max_note")
-                yield Static("音域跨度: -", id="range_span")
-                yield Static("八度跨度: -", id="octave_span")
+        # 音域分析面板
+        with Container(id="range_analysis", classes="section") as range_container:
+            range_container.border_title = "🎼 音域分析"
+            with Vertical():
+                with Horizontal(classes="range_row"):
+                    yield Static("最低音: -", id="min_note")
+                    yield Static("最高音: -", id="max_note")
+                with Horizontal(classes="range_row"):
+                    yield Static("音域跨度: -", id="range_span")
+                    yield Static("八度跨度: -", id="octave_span")
 
-        # 映射策略建议
-        with Container(id="mapping_suggestions"):
-            yield Static("映射策略建议", classes="section_title")
+        # 映射策略建议面板
+        with Container(id="mapping_suggestions", classes="section") as mapping_container:
+            mapping_container.border_title = "🎯 映射策略建议"
             yield DataTable(id="strategy_table", cursor_type="none")
 
-        # 详细分析结果 - 简化为直接显示
-        yield Static("详细分析", classes="section_title")
-        yield Static("选择歌曲并点击分析按钮开始分析", id="analysis_details", classes="analysis_text")
+        # 详细分析结果面板
+        with Container(id="detailed_analysis", classes="section") as detail_container:
+            detail_container.border_title = "📋 详细分析"
+            yield Static("选择歌曲并点击分析按钮开始分析", id="analysis_details", classes="analysis_text")
 
     def on_mount(self) -> None:
         """组件挂载时初始化"""
@@ -84,6 +108,7 @@ class AnalysisPanel(Container):
         self.query_one("#song_name_info", Static).update("歌曲名称: 未选择")
         self.query_one("#bpm_info", Static).update("BPM: -")
         self.query_one("#bars_info", Static).update("小节数: -")
+        self.query_one("#duration_info", Static).update("总时长: -")
 
         # 清除音域信息
         self.query_one("#min_note", Static).update("最低音: -")
@@ -97,6 +122,10 @@ class AnalysisPanel(Container):
 
         # 清除详细分析
         self.query_one("#analysis_details", Static).update("选择歌曲并点击分析按钮开始分析")
+        
+        # 清除状态显示
+        self.query_one("#analysis_status_display", Static).update("状态: 等待分析")
+        self.query_one("#analysis_progress", ProgressBar).progress = 0
 
     def _update_analysis_display(self, song_name: str, analysis: Dict) -> None:
         """更新分析显示"""
@@ -105,6 +134,19 @@ class AnalysisPanel(Container):
         self.query_one("#song_name_info", Static).update(f"歌曲名称: {song_name}")
         self.query_one("#bpm_info", Static).update(f"BPM: {song_info.get('bpm', '-')}")
         self.query_one("#bars_info", Static).update(f"小节数: {song_info.get('bars', '-')}")
+        
+        # 计算总时长
+        bpm = song_info.get('bpm', 120)
+        bars = song_info.get('bars', 0)
+        if bpm and bars:
+            # 假设每小节四拍，计算时长
+            duration_seconds = (bars * 4) * (60 / bpm)
+            minutes = int(duration_seconds // 60)
+            seconds = int(duration_seconds % 60)
+            duration_text = f"{minutes:02d}:{seconds:02d}"
+        else:
+            duration_text = "-"
+        self.query_one("#duration_info", Static).update(f"总时长: {duration_text}")
 
         # 更新音域信息
         range_info = analysis.get("range_info", {})
@@ -118,6 +160,10 @@ class AnalysisPanel(Container):
 
         # 更新详细分析
         self._update_detailed_analysis(analysis)
+        
+        # 更新状态显示
+        self.query_one("#analysis_status_display", Static).update("状态: 分析完成")
+        self.query_one("#analysis_progress", ProgressBar).progress = 100
 
     def _update_strategy_table(self, suggestions: Dict) -> None:
         """更新策略表格"""
@@ -182,15 +228,24 @@ class AnalysisPanel(Container):
     def _analyze_song(self, song_name: str) -> None:
         """分析指定歌曲"""
         try:
+            # 更新分析状态
+            self.analysis_status = AnalysisStatus.ANALYZING
+            self.query_one("#analysis_status_display", Static).update("状态: 正在分析...")
+            self.query_one("#analysis_progress", ProgressBar).progress = 25
+            
             # 获取歌曲数据
             success, song, error_msg = self.song_service.get_song_safely(song_name)
             if not success:
                 self._show_error(error_msg)
                 return
+            
+            self.query_one("#analysis_progress", ProgressBar).progress = 50
 
             # 解析歌曲
             parsed = self.parser.parse(song.jianpu)
             range_info = self.parser.get_range_info(parsed)
+            
+            self.query_one("#analysis_progress", ProgressBar).progress = 75
 
             # 获取映射建议
             preview = self.converter.get_conversion_preview(parsed)
@@ -213,15 +268,19 @@ class AnalysisPanel(Container):
             }
 
             self.analysis_data = analysis_data
+            self.analysis_status = AnalysisStatus.COMPLETED
             self._update_analysis_display(song_name, analysis_data)
             self.post_message(self.AnalysisCompleted(song_name, analysis_data))
 
         except Exception as e:
+            self.analysis_status = AnalysisStatus.ERROR
             self._show_error(f"分析失败: {str(e)}")
 
     def _show_error(self, message: str) -> None:
         """显示错误信息"""
         self.query_one("#analysis_details", Static).update(f"❌ {message}")
+        self.query_one("#analysis_status_display", Static).update(f"状态: 分析失败")
+        self.query_one("#analysis_progress", ProgressBar).progress = 0
         if hasattr(self.app, 'notify'):
             self.app.notify(message, severity="error")
 
@@ -229,23 +288,13 @@ class AnalysisPanel(Container):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """处理按钮点击"""
         if event.button.id == "analyze_btn":
-            song_input = self.query_one("#song_input", Input)
-            song_name = song_input.value.strip()
-            
-            if not song_name:
-                self._show_error("请输入歌曲名称")
-                return
-            
-            self.current_song = song_name
-            self.query_one("#analysis_details", Static).update("正在分析...")
-            self._analyze_song(song_name)
+            self.analyze_current_song()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """处理输入提交（按回车）"""
         if event.input.id == "song_input":
-            # 触发分析按钮
-            analyze_btn = self.query_one("#analyze_btn", Button)
-            self.post_message(Button.Pressed(analyze_btn))
+            # 直接分析当前歌曲
+            self.analyze_current_song()
 
     # 响应式属性监听器
     def watch_current_song(self, song_name: Optional[str]) -> None:
@@ -253,13 +302,63 @@ class AnalysisPanel(Container):
         if song_name:
             song_input = self.query_one("#song_input", Input)
             song_input.value = song_name
+    
+    def watch_analysis_status(self, status: AnalysisStatus) -> None:
+        """监听分析状态变化"""
+        try:
+            # 更新状态显示和进度条
+            status_display = self.query_one("#analysis_status_display", Static)
+            progress_bar = self.query_one("#analysis_progress", ProgressBar)
+            
+            if status == AnalysisStatus.IDLE:
+                status_display.update("状态: 等待分析")
+                progress_bar.progress = 0
+            elif status == AnalysisStatus.ANALYZING:
+                status_display.update("状态: 正在分析...")
+                # 进度条在_analyze_song方法中更新
+            elif status == AnalysisStatus.COMPLETED:
+                status_display.update("状态: 分析完成")
+                progress_bar.progress = 100
+            elif status == AnalysisStatus.ERROR:
+                status_display.update("状态: 分析失败")
+                progress_bar.progress = 0
+        except Exception:
+            # 如果更新失败，忽略错误
+            pass
 
     # 公共方法
-    def set_song_for_analysis(self, song_name: str) -> None:
-        """设置要分析的歌曲"""
+    def set_song_for_analysis(self, song_name: str, auto_analyze: bool = True) -> None:
+        """设置要分析的歌曲
+        
+        Args:
+            song_name: 歌曲名称
+            auto_analyze: 是否自动开始分析
+        """
+        self.current_song = song_name
+        
+        # 更新输入框显示
+        song_input = self.query_one("#song_input", Input)
+        song_input.value = song_name
+        
+        if auto_analyze:
+            self._analyze_song(song_name)
+    
+    def analyze_current_song(self) -> None:
+        """分析当前输入框中的歌曲"""
+        song_input = self.query_one("#song_input", Input)
+        song_name = song_input.value.strip()
+        
+        if not song_name:
+            self._show_error("请输入歌曲名称")
+            return
+        
         self.current_song = song_name
         self._analyze_song(song_name)
 
     def get_analysis_results(self) -> Optional[Dict]:
         """获取分析结果"""
         return self.analysis_data
+    
+    def get_current_song(self) -> Optional[str]:
+        """获取当前选中的歌曲名称"""
+        return self.current_song

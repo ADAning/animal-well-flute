@@ -250,3 +250,18 @@ def reload_config(config_file: Optional[Path] = None) -> AppConfig:
     global _app_config
     _app_config = AppConfig(config_file)
     return _app_config
+
+
+def save_app_config(config_data: Dict[str, Any]) -> None:
+    """保存配置数据到文件
+
+    Args:
+        config_data: 要保存的配置数据
+    """
+    config = get_app_config()
+    
+    # 合并配置数据
+    config._merge_config(config.config, config_data)
+    
+    # 保存到文件
+    config.save_config()

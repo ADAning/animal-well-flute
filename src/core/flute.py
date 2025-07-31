@@ -43,11 +43,13 @@ class AutoFlute:
         self,
         blow_key: str = "x",
         keyboard: Optional[Controller] = None,
+        progress_callback: Optional[callable] = None,
     ):
         self.keyboard = keyboard or Controller()
         self.blow_key = blow_key
         self.stop_requested = False
         self.listener = None
+        self.progress_callback = progress_callback
         logger.info(f"AutoFlute initialized with blow_key={blow_key}")
 
     def _convert_key(self, key_str: str):
@@ -57,7 +59,7 @@ class AutoFlute:
     def _on_press(self, key):
         """处理按键事件"""
         if key == Key.esc:
-            print(f"\n⏹️  检测到ESC键，停止演奏...")
+            logger.info("ESC key detected, stopping playback...")
             self.stop_requested = True
             return False  # 停止监听
 
@@ -66,7 +68,7 @@ class AutoFlute:
         self.stop_requested = False
         self.listener = Listener(on_press=self._on_press)
         self.listener.start()
-        print(f"🎹 按ESC键可随时停止演奏")
+        logger.info("ESC key listener started - press ESC to stop playback")
 
     def _stop_listener(self):
         """停止ESC键监听"""
@@ -83,7 +85,6 @@ class AutoFlute:
 
         if not note.key_combination:
             # 休止符，只需要等待
-            print(f"🎵 休止符 - 等待 {blow_time:.2f}s")
             logger.debug(f"Rest note, waiting for {blow_time:.2f}s")
             # 分段等待，以便能响应停止请求
             steps = max(1, int(blow_time * 10))  # 每100ms检查一次
@@ -97,8 +98,8 @@ class AutoFlute:
         key_display = (
             " + ".join(note.key_combination) if note.key_combination else "无按键"
         )
-        print(
-            f"🎵 演奏音符: {note.notation} (高度: {note.physical_height:.1f}) - 按键: {key_display} - 时长: {blow_time:.2f}s"
+        logger.debug(
+            f"Playing note: {note.notation} (height: {note.physical_height:.1f}) - keys: {key_display} - duration: {blow_time:.2f}s"
         )
 
         # 按下所有按键
@@ -142,7 +143,6 @@ class AutoFlute:
         if self.stop_requested:
             return False
 
-        print(f"🎼 开始演奏小节 (包含 {len(bar)} 个音符)")
         logger.info(f"Playing bar with {len(bar)} notes")
 
         for note in bar:
@@ -159,7 +159,6 @@ class AutoFlute:
 
     def play_song(self, bars: List[List[PhysicalNote]], beat_interval: float) -> None:
         """演奏整首乐曲"""
-        print(f"🎶 开始演奏乐曲 (共 {len(bars)} 小节)")
         logger.info(f"Starting to play song with {len(bars)} bars")
 
         # 启动ESC键监听
@@ -170,17 +169,21 @@ class AutoFlute:
                 if self.stop_requested:
                     break
 
-                print(f"\n📊 第 {i}/{len(bars)} 小节:")
                 logger.info(f"Playing bar {i}/{len(bars)}")
+                
+                # 通知进度回调
+                if self.progress_callback:
+                    try:
+                        self.progress_callback(i, len(bars), f"Playing bar {i}/{len(bars)}")
+                    except Exception as e:
+                        logger.warning(f"Progress callback failed: {e}")
 
                 if not self.play_bar(bar, beat_interval):
                     break
 
             if self.stop_requested:
-                print(f"\n⏹️  演奏已停止")
                 logger.info("Song stopped by user")
             else:
-                print(f"\n🎉 乐曲演奏完成！")
                 logger.info("Song finished")
         finally:
             # 停止ESC键监听

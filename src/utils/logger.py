@@ -24,15 +24,61 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
     return logger
 
 
-def setup_logging(level: str = "INFO") -> None:
+def setup_logging(level: str = "INFO", tui_mode: bool = False) -> None:
     """设置全局日志配置
 
     Args:
         level: 日志级别
+        tui_mode: 是否为TUI模式，如果是则不输出到控制台
     """
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
+    # 获取根日志器
+    root_logger = logging.getLogger()
+    
+    # 强制清除所有现有的处理器
+    for handler in root_logger.handlers[:]:
+        handler.close()
+        root_logger.removeHandler(handler)
+    
+    # 也清除所有子日志器的处理器
+    for name in logging.Logger.manager.loggerDict:
+        logger_instance = logging.getLogger(name)
+        for handler in logger_instance.handlers[:]:
+            handler.close()
+            logger_instance.removeHandler(handler)
+    
+    # 设置日志级别
+    root_logger.setLevel(getattr(logging, level.upper()))
+    
+    if tui_mode:
+        # TUI模式：完全禁用日志输出到控制台
+        # 使用NullHandler完全静默
+        null_handler = logging.NullHandler()
+        root_logger.addHandler(null_handler)
+        
+        # 可选：如果需要调试，可以同时输出到文件
+        try:
+            from pathlib import Path
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True)
+            
+            file_handler = logging.FileHandler(log_dir / "tui.log", encoding='utf-8')
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S"
+            )
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
+        except Exception:
+            pass  # 如果文件创建失败，只使用NullHandler
+    else:
+        # CLI模式：正常输出到控制台
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setFormatter(formatter)
+        root_logger.addHandler(stream_handler)
+    
+    # 禁用 logging.basicConfig() 的后续调用
+    logging.root.handlers = root_logger.handlers

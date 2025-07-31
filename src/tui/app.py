@@ -15,6 +15,8 @@ from .components.song_browser import SongBrowser
 from .components.play_control import PlayControl
 from .components.analysis_panel import AnalysisPanel
 from .components.settings_panel import SettingsPanel
+from .components.image_import_dialog import ImageImportDialog
+from .components.song_details_dialog import SongDetailsDialog
 
 
 class AnimalWellFluteApp(App):
@@ -29,6 +31,7 @@ class AnimalWellFluteApp(App):
         Binding("ctrl+c", "quit", "退出", priority=True),
         Binding("f1", "help", "帮助"),
         Binding("f2", "toggle_dark", "切换主题"),
+        # 歌曲浏览器快捷键现在是动态管理的，不在这里定义
     ]
     
     # 响应式状态
@@ -41,7 +44,7 @@ class AnimalWellFluteApp(App):
         
         # 初始化配置和服务
         self.config = get_app_config()
-        setup_logging(self.config.log_level)
+        setup_logging(self.config.log_level, tui_mode=True)  # TUI模式下不输出到控制台
         self.song_service = SongServiceBase()
         
         # 设置播放回调
@@ -98,6 +101,69 @@ class AnimalWellFluteApp(App):
         # 初始化状态显示
         self._update_status_displays()
 
+    # 歌曲浏览器快捷键动作
+    def action_browser_play(self) -> None:
+        """转发播放动作到歌曲浏览器"""
+        if self._is_browser_active():
+            try:
+                browser = self.query_one(SongBrowser)
+                browser.action_play_selected()
+            except Exception:
+                pass
+
+    def action_browser_analyze(self) -> None:
+        """转发分析动作到歌曲浏览器"""
+        if self._is_browser_active():
+            try:
+                browser = self.query_one(SongBrowser)
+                browser.action_analyze_selected()
+            except Exception:
+                pass
+
+    def action_browser_details(self) -> None:
+        """转发详情动作到歌曲浏览器"""
+        if self._is_browser_active():
+            try:
+                browser = self.query_one(SongBrowser)
+                browser.action_show_details()
+            except Exception:
+                pass
+
+    def _is_browser_active(self) -> bool:
+        """检查当前是否在歌曲浏览器标签页"""
+        try:
+            tabbed_content = self.query_one(TabbedContent)
+            return tabbed_content.active == "browser"
+        except Exception:
+            return False
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """处理标签页切换事件，动态更新快捷键显示"""
+        # 检查是否在浏览器标签页
+        is_browser_active = (event.tab.id == "browser")
+        
+        # 使用 Textual 的动态绑定机制
+        # 先移除现有的浏览器绑定
+        try:
+            self.unbind("enter")
+            self.unbind("space") 
+            self.unbind("i")
+        except Exception:
+            pass  # 如果绑定不存在，忽略错误
+        
+        # 如果在浏览器标签页，重新添加绑定
+        if is_browser_active:
+            self.bind("enter", "browser_play", "播放", priority=True)
+            self.bind("space", "browser_analyze", "分析", priority=True)
+            self.bind("i", "browser_details", "详情", priority=True)
+        
+        # 刷新 Footer 显示
+        try:
+            footer = self.query_one(Footer)
+            footer.refresh()
+        except Exception:
+            pass
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """处理按钮点击事件"""
         button_id = event.button.id
@@ -145,8 +211,8 @@ class AnimalWellFluteApp(App):
 
     def _handle_import_action(self):
         """处理导入动作"""
-        # TODO: 实现图片导入功能
-        self.notify("导入功能正在开发中...")
+        # 打开图片导入对话框
+        self.push_screen(ImageImportDialog())
     
     def start_playback(self, song_name: str, switch_tab: bool = True) -> bool:
         """统一的播放启动方法
@@ -241,6 +307,66 @@ class AnimalWellFluteApp(App):
         """处理分析完成消息"""
         self.notify(f"分析完成: {message.song_name}")
         # 可以在这里添加更多的处理逻辑，比如更新仪表板显示等
+
+    def on_image_import_dialog_import_completed(self, message: ImageImportDialog.ImportCompleted) -> None:
+        """处理图片导入完成消息"""
+        results = message.results
+        
+        if results.get("success", False):
+            if "output_file" in results:
+                # 单个文件导入成功
+                song_name = results.get("song_name", "未知歌曲")
+                self.notify(f"导入成功: {song_name}", title="图片导入", timeout=5)
+                
+                # 刷新歌曲浏览器
+                try:
+                    browser = self.query_one(SongBrowser)
+                    browser.refresh_songs()
+                except Exception:
+                    pass
+            else:
+                # 批量导入
+                success_count = results.get("successful_imports", 0)
+                total_count = results.get("total_images", 0)
+                self.notify(f"批量导入完成: {success_count}/{total_count}", title="图片导入", timeout=5)
+        else:
+            error_msg = results.get("error", "未知错误")
+            self.notify(f"导入失败: {error_msg}", severity="error", title="图片导入", timeout=8)
+
+    def on_image_import_dialog_import_cancelled(self, message: ImageImportDialog.ImportCancelled) -> None:
+        """处理图片导入取消消息"""
+        self.notify("已取消图片导入", timeout=3)
+
+    def on_song_details_dialog_play_requested(self, message: SongDetailsDialog.PlayRequested) -> None:
+        """处理歌曲详情对话框的播放请求"""
+        self.start_playback(message.song_name, switch_tab=True)
+
+    def on_song_details_dialog_analyze_requested(self, message: SongDetailsDialog.AnalyzeRequested) -> None:
+        """处理歌曲详情对话框的分析请求"""
+        self.current_song = message.song_name
+        self._update_status_displays()
+        
+        # 切换到分析标签页并设置分析歌曲
+        self.query_one(TabbedContent).active = "analyzer"
+        
+        try:
+            analysis_panel = self.query_one(AnalysisPanel)
+            analysis_panel.set_song_for_analysis(message.song_name)
+        except Exception as e:
+            self.notify(f"设置分析歌曲失败: {str(e)}", severity="error")
+
+    def on_settings_panel_settings_changed(self, message: SettingsPanel.SettingsChanged) -> None:
+        """处理设置变更消息"""
+        setting_name = message.setting_name
+        new_value = message.new_value
+        
+        if setting_name == "theme":
+            theme_name = "深色" if new_value == "dark" else "浅色"
+            self.notify(f"主题已切换到{theme_name}模式", timeout=3)
+        elif setting_name == "all":
+            self.notify("所有设置已保存并应用", timeout=3)
+        else:
+            self.notify(f"设置已更新: {setting_name}", timeout=3)
 
     def _update_status_displays(self):
         """更新状态显示"""
