@@ -2,7 +2,7 @@
 
 from textual.widgets import Button, Static, ProgressBar, Input, Select
 from textual.widgets.option_list import Option
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal
 from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.message import Message
@@ -56,6 +56,14 @@ class PlayControl(Container):
     progress: reactive[float] = reactive(0.0)
     current_bpm: reactive[int] = reactive(120)
     ready_time: reactive[int] = reactive(3)
+    
+    # 实时播放信息
+    current_bar: reactive[int] = reactive(0)
+    total_bars: reactive[int] = reactive(0)
+    current_note: reactive[str] = reactive("—")
+    current_key: reactive[str] = reactive("—")
+    elapsed_time: reactive[str] = reactive("00:00")
+    remaining_time: reactive[str] = reactive("00:00")
 
     def __init__(self, song_service: SongServiceBase):
         """初始化播放控制组件"""
@@ -68,42 +76,55 @@ class PlayControl(Container):
 
     def compose(self) -> ComposeResult:
         """构建组件界面"""
-        with Vertical():
-            # 当前歌曲信息
-            with Container(id="current_song_info"):
-                yield Static("当前歌曲: 无", id="song_title")
-                yield ProgressBar(total=100, show_percentage=True, id="play_progress")
-                yield Static("状态: 停止", id="play_status_text")
+        # 当前歌曲信息
+        with Container(id="current_song_info"):
+            yield Static("🎵 当前歌曲: 无", id="song_title")
+            yield ProgressBar(total=100, show_percentage=True, id="play_progress")
+            yield Static("🔄 状态: 停止", id="play_status_text")
 
-            # 播放控制按钮
-            with Container(id="play_controls"):
-                with Horizontal(classes="control_row"):
-                    yield Button("▶️ 播放", id="play_btn", variant="primary")
-                    yield Button("⏸️ 暂停", id="pause_btn", variant="default")
-                    yield Button("⏹️ 停止", id="stop_btn", variant="default")
-                    yield Button("🔄 重播", id="replay_btn", variant="default")
+        # 实时播放信息面板
+        with Container(id="realtime_info"):
+            yield Static("🎤 实时播放信息", classes="section_title")
+            with Horizontal(classes="realtime_row"):
+                yield Static("进度: 0/0 小节", id="bar_progress")
+                yield Static("音符: —", id="current_note_display")
+                yield Static("按键: —", id="current_key_display")
+            with Horizontal(classes="realtime_row"):
+                yield Static("已播放: 00:00", id="elapsed_display")
+                yield Static("剩余: 00:00", id="remaining_display")
+                yield Static("状态: 停止", id="detailed_status")
 
-            # 播放设置
-            with Container(id="play_settings"):
-                with Horizontal(classes="settings_row"):
-                    yield Static("BPM:", classes="setting_label")
-                    yield Input(
-                        value=str(self.current_bpm),
-                        placeholder="BPM",
-                        id="bpm_input",
-                        classes="number_input"
-                    )
-                    yield Static("准备时间:", classes="setting_label")
-                    yield Input(
-                        value=str(self.ready_time),
-                        placeholder="3",
-                        id="ready_time_input",
-                        classes="number_input"
-                    )
+        # 播放控制按钮
+        with Container(id="play_controls"):
+            yield Static("🎮 播放控制", classes="section_title")
+            with Horizontal(classes="control_row"):
+                yield Button("▶️ 播放", id="play_btn", variant="primary")
+                yield Button("⏸️ 暂停", id="pause_btn", variant="default")
+                yield Button("⏹️ 停止", id="stop_btn", variant="default")
+                yield Button("🔄 重播", id="replay_btn", variant="default")
 
-            # 策略选择
-            with Container(id="strategy_settings"):
-                yield Static("映射策略:", classes="setting_label")
+        # 播放参数设置
+        with Container(id="unified_settings"):
+            yield Static("🎵 播放参数", classes="section_title")
+            with Horizontal(classes="unified_settings_row"):
+                # BPM设置
+                yield Static("BPM:", classes="setting_label")
+                yield Input(
+                    value=str(self.current_bpm),
+                    placeholder="BPM",
+                    id="bpm_input",
+                    classes="number_input"
+                )
+                # 准备时间设置
+                yield Static("准备时间:", classes="setting_label")
+                yield Input(
+                    value=str(self.ready_time),
+                    placeholder="3",
+                    id="ready_time_input",
+                    classes="number_input"
+                )
+                # 策略设置
+                yield Static("策略:", classes="setting_label")
                 yield Select(
                     [
                         ("optimal", "最优映射"),
@@ -113,18 +134,21 @@ class PlayControl(Container):
                         ("manual", "手动偏移"),
                         ("none", "无偏移")
                     ],
-                    id="strategy_select"
+                    id="strategy_select",
+                    classes="strategy_select"
                 )
+            # 手动偏移输入单独一行
+            with Horizontal(classes="manual_offset_row"):
                 yield Input(
                     placeholder="手动偏移值 (半音)",
                     id="manual_offset_input",
-                    classes="number_input"
+                    classes="number_input manual_offset"
                 )
 
-            # 歌曲信息显示
-            with Container(id="song_analysis"):
-                yield Static("音域信息: 未分析", id="range_info")
-                yield Static("映射建议: 未分析", id="mapping_info")
+        # 歌曲信息显示
+        with Container(id="song_analysis"):
+            yield Static("音域信息: 未分析", id="range_info")
+            yield Static("映射建议: 未分析", id="mapping_info")
 
     def on_mount(self) -> None:
         """组件挂载时初始化"""
@@ -220,10 +244,10 @@ class PlayControl(Container):
         """更新歌曲信息显示"""
         song_title = self.query_one("#song_title", Static)
         if self.current_song:
-            song_title.update(f"当前歌曲: {self.current_song}")
+            song_title.update(f"🎵 当前歌曲: {self.current_song}")
             self._analyze_current_song()
         else:
-            song_title.update("当前歌曲: 无")
+            song_title.update("🎵 当前歌曲: 无")
             self._clear_analysis()
 
     def _analyze_current_song(self) -> None:
@@ -241,6 +265,9 @@ class PlayControl(Container):
             # 解析歌曲
             parsed = self.parser.parse(song.jianpu)
             range_info = self.parser.get_range_info(parsed)
+
+            # 计算总小节数
+            self.total_bars = len(parsed)
 
             # 获取映射建议
             preview = self.converter.get_conversion_preview(parsed)
@@ -281,6 +308,9 @@ class PlayControl(Container):
         try:
             self.play_status = PlayStatus.LOADING
             
+            # 重置实时信息
+            self._reset_realtime_info()
+            
             # 获取歌曲数据以获取正确的BPM
             success, song, error_msg = self.song_service.get_song_safely(self.current_song)
             if not success:
@@ -319,12 +349,15 @@ class PlayControl(Container):
             if success:
                 self.play_status = PlayStatus.STOPPED
                 self.progress = 0
+                self._reset_realtime_info()
                 self.post_message(self.PlayStopped(self.current_song))
             else:
                 self.play_status = PlayStatus.ERROR
+                self._reset_realtime_info()
 
         except Exception as e:
             self.play_status = PlayStatus.ERROR
+            self._reset_realtime_info()
             if hasattr(self.app, 'notify'):
                 self.app.notify(f"播放失败: {str(e)}", severity="error")
 
@@ -405,7 +438,7 @@ class PlayControl(Container):
             
             # 如果需要进度更新，可以创建一个监控任务
             async def monitor_progress():
-                """监控播放进度（简单估算）"""
+                """监控播放进度和实时信息"""
                 total_notes = sum(len(bar) for bar in converted)
                 if total_notes == 0:
                     return
@@ -417,11 +450,45 @@ class PlayControl(Container):
                         total_time += note.time_factor * beat_interval
                 
                 start_time = asyncio.get_event_loop().time()
+                current_bar_index = 0
+                current_note_index = 0
+                
                 while not success_future.done():
                     await asyncio.sleep(0.1)
                     elapsed = asyncio.get_event_loop().time() - start_time
                     progress = min(100, (elapsed / total_time) * 100) if total_time > 0 else 0
+                    
+                    # 估算当前小节和音符
+                    estimated_bar = min(int((elapsed / total_time) * len(converted)), len(converted) - 1) if total_time > 0 else 0
+                    
+                    # 获取当前音符信息
+                    current_note_text = "—"
+                    current_key_text = "—"
+                    if estimated_bar < len(converted) and len(converted[estimated_bar]) > 0:
+                        # 简单估算当前音符
+                        bar_notes = converted[estimated_bar]
+                        note_in_bar = min(len(bar_notes) - 1, int((elapsed % (total_time / len(converted))) / beat_interval)) if beat_interval > 0 else 0
+                        if 0 <= note_in_bar < len(bar_notes):
+                            note = bar_notes[note_in_bar]
+                            if hasattr(note, 'note_text'):
+                                current_note_text = getattr(note, 'note_text', '—')
+                            if hasattr(note, 'key_combination') and note.key_combination:
+                                current_key_text = '+'.join(note.key_combination)
+                    
+                    # 格式化时间
+                    elapsed_str = self._format_time(elapsed)
+                    remaining_str = self._format_time(max(0, total_time - elapsed))
+                    
+                    # 更新进度和实时信息
                     loop.call_soon_threadsafe(self._update_progress, progress)
+                    loop.call_soon_threadsafe(
+                        self._update_realtime_info, 
+                        estimated_bar + 1, 
+                        current_note_text, 
+                        current_key_text, 
+                        elapsed_str, 
+                        remaining_str
+                    )
             
             # 创建一个Future来跟踪播放完成状态
             success_future = loop.run_in_executor(None, play_with_cli_method)
@@ -461,6 +528,7 @@ class PlayControl(Container):
                 self.play_task.cancel()
             self.play_status = PlayStatus.STOPPED
             self.progress = 0
+            self._reset_realtime_info()
             progress_bar = self.query_one("#play_progress", ProgressBar)
             progress_bar.progress = 0
             if self.current_song:
@@ -524,13 +592,53 @@ class PlayControl(Container):
             PlayStatus.LOADING: "加载中",
             PlayStatus.ERROR: "错误"
         }
-        status_text.update(f"状态: {status_map[status]}")
+        status_text.update(f"🔄 状态: {status_map[status]}")
         self._update_controls_state()
 
     def watch_progress(self, progress: float) -> None:
         """监听播放进度变化"""
         progress_bar = self.query_one("#play_progress", ProgressBar)
         progress_bar.progress = min(100, max(0, progress))
+        
+    def watch_current_bar(self, bar: int) -> None:
+        """监听当前小节变化"""
+        try:
+            bar_progress = self.query_one("#bar_progress", Static)
+            bar_progress.update(f"进度: {bar}/{self.total_bars} 小节")
+        except Exception:
+            pass
+            
+    def watch_current_note(self, note: str) -> None:
+        """监听当前音符变化"""
+        try:
+            note_display = self.query_one("#current_note_display", Static)
+            note_display.update(f"音符: {note}")
+        except Exception:
+            pass
+            
+    def watch_current_key(self, key: str) -> None:
+        """监听当前按键变化"""
+        try:
+            key_display = self.query_one("#current_key_display", Static)
+            key_display.update(f"按键: {key}")
+        except Exception:
+            pass
+            
+    def watch_elapsed_time(self, time: str) -> None:
+        """监听已播放时间变化"""
+        try:
+            elapsed_display = self.query_one("#elapsed_display", Static)
+            elapsed_display.update(f"已播放: {time}")
+        except Exception:
+            pass
+            
+    def watch_remaining_time(self, time: str) -> None:
+        """监听剩余时间变化"""
+        try:
+            remaining_display = self.query_one("#remaining_display", Static)
+            remaining_display.update(f"剩余: {time}")
+        except Exception:
+            pass
 
     # 公共方法
     def set_current_song(self, song_name: str, auto_play: bool = False) -> None:
@@ -584,6 +692,31 @@ class PlayControl(Container):
             progress_bar.progress = min(100, max(0, progress))
         except Exception:
             pass  # 如果UI更新失败，忽略错误
+            
+    def _update_realtime_info(self, bar_num: int, note_text: str, key_text: str, elapsed: str, remaining: str) -> None:
+        """更新实时播放信息（线程安全）"""
+        try:
+            self.current_bar = bar_num
+            self.current_note = note_text
+            self.current_key = key_text
+            self.elapsed_time = elapsed
+            self.remaining_time = remaining
+        except Exception:
+            pass  # 如果更新失败，忽略错误
+            
+    def _reset_realtime_info(self) -> None:
+        """重置实时信息"""
+        self.current_bar = 0
+        self.current_note = "—"
+        self.current_key = "—"
+        self.elapsed_time = "00:00"
+        self.remaining_time = "00:00"
+        
+    def _format_time(self, seconds: float) -> str:
+        """格式化时间显示"""
+        minutes = int(seconds // 60)
+        seconds = int(seconds % 60)
+        return f"{minutes:02d}:{seconds:02d}"
 
     def _trigger_auto_play(self) -> None:
         """触发自动播放"""
@@ -608,6 +741,7 @@ class PlayControl(Container):
             self.play_task.cancel()
         self.play_status = PlayStatus.STOPPED
         self.progress = 0
+        self._reset_realtime_info()
 
     def get_play_settings(self) -> dict:
         """获取当前播放设置"""

@@ -7,7 +7,7 @@ Screen {
 
 /* 主容器样式 */
 #dashboard_content {
-    padding: 1 2;
+    padding: 0 1;
     height: 1fr;
 }
 
@@ -24,7 +24,7 @@ Container {
     color: $primary;
     text-style: bold;
     background: $surface;
-    border: solid $primary;
+    border: round $primary;
 }
 
 /* 按钮行布局 */
@@ -44,7 +44,7 @@ Container {
     margin: 1 0;
     padding: 1;
     background: $surface;
-    border: solid $accent;
+    border: round $accent;
     text-align: center;
     height: 3;
     content-align: center middle;
@@ -62,7 +62,7 @@ Container {
 
 /* 标签页内容样式 */
 TabPane {
-    padding: 1;
+    padding: 0;
 }
 
 /* 占位符样式 */
@@ -71,7 +71,7 @@ TabPane {
     content-align: center middle;
     color: $warning;
     background: $surface;
-    border: dashed $warning;
+    border: round $warning;
     height: 80%;
     margin: 2;
 }
@@ -99,7 +99,7 @@ Button.-primary:hover {
 /* Header 和 Footer 增强 */
 Header {
     dock: top;
-    height: 3;
+    height: 2;
 }
 
 Footer {
@@ -120,7 +120,7 @@ ContentTabs {
 Notification {
     background: $boost;
     color: $text;
-    border: solid $primary;
+    border: round $primary;
 }
 
 /* 滚动条样式 - Textual 使用不同的滚动条语法 */
@@ -135,14 +135,14 @@ ScrollbarThumb {
 /* 深色主题特定样式 */
 Screen.-dark-mode #welcome {
     background: $surface-darken-1;
-    border: solid $primary-lighten-1;
+    border: round $primary-lighten-1;
     color: $primary-lighten-1;
 }
 
 /* 浅色主题特定样式 */
 Screen.-light-mode #welcome {
     background: $surface-lighten-1;
-    border: solid $primary-darken-1;
+    border: round $primary-darken-1;
     color: $primary-darken-1;
 }
 
@@ -155,7 +155,7 @@ SongBrowser {
     height: 6;
     padding: 1;
     background: $surface;
-    border: solid $accent;
+    border: round $accent;
 }
 
 .search_row {
@@ -212,7 +212,7 @@ PlayControl {
 #current_song_info {
     height: 8;
     background: $surface;
-    border: solid $primary;
+    border: round $primary;
     padding: 1;
     margin: 0 0 1 0;
 }
@@ -234,9 +234,9 @@ PlayControl {
 }
 
 #play_controls {
-    height: 4;
+    height: 6;
     background: $surface;
-    border: solid $accent;
+    border: round $accent;
     padding: 1;
     margin: 0 0 1 0;
 }
@@ -251,10 +251,53 @@ PlayControl {
     width: 8;
 }
 
-#play_settings {
-    height: 4;
+#unified_settings {
+    height: 8;
     background: $surface;
-    border: solid $accent;
+    border: round $accent;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+.unified_settings_row {
+    height: 3;
+    align: center middle;
+}
+
+.manual_offset_row {
+    height: 3;
+    align: left middle;
+    margin: 0 0 1 0;
+}
+
+.setting_label {
+    width: 8;
+    text-align: right;
+    content-align: center middle;
+    color: $text;
+    margin: 0 1;
+}
+
+.number_input {
+    width: 8;
+    margin: 0 1;
+}
+
+.strategy_select {
+    width: 12;
+    margin: 0 1;
+}
+
+.manual_offset {
+    width: 20;
+    margin: 0 1;
+}
+
+# 保留旧样式以防兼容性问题
+#play_settings {
+    height: 6;
+    background: $surface;
+    border: round $accent;
     padding: 1;
     margin: 0 0 1 0;
 }
@@ -264,23 +307,17 @@ PlayControl {
     align: center middle;
 }
 
-.setting_label {
-    width: 10;
-    text-align: right;
-    content-align: center middle;
-    color: $text;
-}
-
-.number_input {
-    width: 8;
-    margin: 0 1;
-}
-
 #strategy_settings {
     height: 6;
     background: $surface;
-    border: solid $accent;
+    border: round $accent;
     padding: 1;
+    margin: 0 0 1 0;
+}
+
+.strategy_row {
+    height: 3;
+    align: center middle;
     margin: 0 0 1 0;
 }
 
@@ -295,16 +332,57 @@ PlayControl {
 }
 
 #song_analysis {
-    height: 6;
+    height: 4;
     background: $surface;
-    border: solid $warning;
+    border: round $warning;
     padding: 1;
 }
 
 #range_info, #mapping_info {
     height: 1;
     color: $text;
-    margin: 1 0;
+    margin: 0 0 1 0;
+}
+
+/* 实时播放信息面板样式 */
+#realtime_info {
+    height: 6;
+    background: $surface;
+    border: round $success;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+.realtime_row {
+    height: 2;
+    align: center middle;
+    margin: 0;
+}
+
+.realtime_row Static {
+    width: 1fr;
+    text-align: center;
+    content-align: center middle;
+    background: $surface-darken-1;
+    border: round $success;
+    margin: 0 1;
+    color: $text;
+    padding: 0 1;
+}
+
+#bar_progress {
+    color: $primary;
+    text-style: bold;
+}
+
+#current_note_display {
+    color: $warning;
+    text-style: bold;
+}
+
+#current_key_display {
+    color: $success;
+    text-style: bold;
 }
 
 /* 分析面板组件样式 */
@@ -316,7 +394,7 @@ AnalysisPanel {
 #analysis_header {
     height: 4;
     background: $surface;
-    border: solid $primary;
+    border: round $primary;
     padding: 1;
     margin: 0 0 1 0;
 }
@@ -344,7 +422,7 @@ AnalysisPanel {
 
 #basic_info, #range_analysis, #mapping_suggestions, #detailed_analysis {
     background: $surface;
-    border: solid $accent;
+    border: round $accent;
     padding: 1;
     margin: 0 0 1 0;
 }
@@ -361,9 +439,7 @@ AnalysisPanel {
     height: 8;
 }
 
-#detailed_analysis {
-    height: 8;
-}
+/* 移除detailed_analysis容器，使用直接样式 */
 
 .section_title {
     text-style: bold;
@@ -382,7 +458,7 @@ AnalysisPanel {
     text-align: center;
     content-align: center middle;
     background: $surface-darken-1;
-    border: solid $accent;
+    border: round $accent;
     margin: 0 1;
 }
 
@@ -390,12 +466,13 @@ AnalysisPanel {
     height: 1fr;
 }
 
-#analysis_details {
-    height: 1fr;
+.analysis_text {
+    height: auto;
     color: $text;
     background: $surface-darken-1;
     padding: 1;
-    border: solid $accent;
+    margin: 1 0;
+    border: round $accent;
 }
 
 /* 设置面板组件样式 */
@@ -406,7 +483,7 @@ SettingsPanel {
 
 #appearance_settings, #playback_settings, #advanced_settings, #settings_actions, #settings_info {
     background: $surface;
-    border: solid $accent;
+    border: round $accent;
     padding: 1;
     margin: 0 0 1 0;
 }
@@ -470,7 +547,7 @@ SettingsPanel {
     color: $text;
     background: $surface-darken-1;
     padding: 1;
-    border: solid $accent;
+    border: round $accent;
     text-align: center;
     content-align: center middle;
 }

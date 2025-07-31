@@ -1,7 +1,7 @@
 """分析面板组件"""
 
 from textual.widgets import Button, Static, Input, DataTable, Select
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal
 from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.message import Message
@@ -36,40 +36,38 @@ class AnalysisPanel(Container):
 
     def compose(self) -> ComposeResult:
         """构建组件界面"""
-        with Vertical():
-            # 歌曲选择和分析控制
-            with Container(id="analysis_header"):
-                with Horizontal(classes="song_select_row"):
-                    yield Static("歌曲:", classes="label")
-                    yield Input(placeholder="输入歌曲名称", id="song_input")
-                    yield Button("🔍 分析", id="analyze_btn", variant="primary")
+        # 歌曲选择和分析控制
+        with Container(id="analysis_header"):
+            with Horizontal(classes="song_select_row"):
+                yield Static("歌曲:", classes="label")
+                yield Input(placeholder="输入歌曲名称", id="song_input")
+                yield Button("🔍 分析", id="analyze_btn", variant="primary")
 
-            # 基本信息显示
-            with Container(id="basic_info"):
-                yield Static("基本信息", classes="section_title")
-                with Horizontal(classes="info_row"):
-                    yield Static("歌曲名称: 未选择", id="song_name_info")
-                    yield Static("BPM: -", id="bpm_info")
-                    yield Static("小节数: -", id="bars_info")
+        # 基本信息显示
+        with Container(id="basic_info"):
+            yield Static("基本信息", classes="section_title")
+            with Horizontal(classes="info_row"):
+                yield Static("歌曲名称: 未选择", id="song_name_info")
+                yield Static("BPM: -", id="bpm_info")
+                yield Static("小节数: -", id="bars_info")
 
-            # 音域分析
-            with Container(id="range_analysis"):
-                yield Static("音域分析", classes="section_title")
-                with Horizontal(classes="range_row"):
-                    yield Static("最低音: -", id="min_note")
-                    yield Static("最高音: -", id="max_note")
-                    yield Static("音域跨度: -", id="range_span")
-                    yield Static("八度跨度: -", id="octave_span")
+        # 音域分析
+        with Container(id="range_analysis"):
+            yield Static("音域分析", classes="section_title")
+            with Horizontal(classes="range_row"):
+                yield Static("最低音: -", id="min_note")
+                yield Static("最高音: -", id="max_note")
+                yield Static("音域跨度: -", id="range_span")
+                yield Static("八度跨度: -", id="octave_span")
 
-            # 映射策略建议
-            with Container(id="mapping_suggestions"):
-                yield Static("映射策略建议", classes="section_title")
-                yield DataTable(id="strategy_table", cursor_type="none")
+        # 映射策略建议
+        with Container(id="mapping_suggestions"):
+            yield Static("映射策略建议", classes="section_title")
+            yield DataTable(id="strategy_table", cursor_type="none")
 
-            # 详细分析结果
-            with Container(id="detailed_analysis"):
-                yield Static("详细分析", classes="section_title")
-                yield Static("选择歌曲并点击分析按钮开始分析", id="analysis_details")
+        # 详细分析结果 - 简化为直接显示
+        yield Static("详细分析", classes="section_title")
+        yield Static("选择歌曲并点击分析按钮开始分析", id="analysis_details", classes="analysis_text")
 
     def on_mount(self) -> None:
         """组件挂载时初始化"""
