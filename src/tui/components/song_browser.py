@@ -7,9 +7,11 @@ from textual.reactive import reactive
 from textual.message import Message
 from typing import Optional, List, Tuple
 from dataclasses import dataclass
+from rich.text import Text
 
 from ...services.song_service_base import SongServiceBase
 from ...data.songs.song_manager import SongManager
+from .search_highlighter import highlight_search_matches, create_highlighted_song_display
 
 
 @dataclass
@@ -124,16 +126,36 @@ class SongBrowser(Container):
         table = self.query_one("#songs_table", DataTable)
         table.clear()
         
+        # 获取当前搜索查询
+        current_query = self.search_query.strip() if self.search_query else ""
+        
         for song in self.filtered_songs:
             # 限制描述长度
-            description = song.description[:30] + "..." if len(song.description) > 30 else song.description
-            table.add_row(
-                song.name,
-                str(song.bpm),
-                str(song.bars),
-                description or "无描述",
-                key=song.key
-            )
+            description = song.description[:50] + "..." if len(song.description) > 50 else song.description
+            description = description or "无描述"
+            
+            # 创建带高亮的文本
+            if current_query:
+                highlighted_name = highlight_search_matches(song.name, current_query)
+                highlighted_desc = highlight_search_matches(description, current_query)
+                highlighted_bpm = highlight_search_matches(str(song.bpm), current_query)
+                
+                table.add_row(
+                    highlighted_name,
+                    highlighted_bpm,
+                    str(song.bars),
+                    highlighted_desc,
+                    key=song.key
+                )
+            else:
+                # 没有搜索查询时使用普通文本
+                table.add_row(
+                    song.name,
+                    str(song.bpm),
+                    str(song.bars),
+                    description,
+                    key=song.key
+                )
 
     def _update_status(self, message: str) -> None:
         """更新状态栏"""
@@ -142,6 +164,9 @@ class SongBrowser(Container):
 
     def _filter_songs(self, query: str) -> None:
         """根据搜索查询过滤歌曲"""
+        # 更新搜索查询状态
+        self.search_query = query
+        
         if not query.strip():
             self.filtered_songs = self.all_songs.copy()
         else:

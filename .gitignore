@@ -121,6 +121,8 @@ tasks.xml
 
 # Claude settings
 .claude/
+CLAUDE.local.md
+refs/**
 
 # MacOS settings
 **/.DS_Store
