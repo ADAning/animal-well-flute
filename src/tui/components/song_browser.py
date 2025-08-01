@@ -30,8 +30,12 @@ class SongInfo:
 class SongBrowser(Container):
     """歌曲浏览器组件"""
 
-    # 快捷键绑定由主应用处理，这里不需要重复定义
-    # BINDINGS在主应用中定义为browser_play等，会转发到这里的action方法
+    # 组件级别的键盘绑定
+    BINDINGS = [
+        Binding("enter", "play_selected", "播放", priority=True),
+        Binding("space", "analyze_selected", "分析", priority=True),
+        Binding("i", "show_details", "详情", priority=True),
+    ]
 
     # 自定义消息类
     class SongSelected(Message):

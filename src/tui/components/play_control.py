@@ -73,37 +73,45 @@ class PlayControl(Container):
         self.converter = AutoConverter()
         self.flute = AutoFlute(progress_callback=self._on_playback_progress)
         self.play_task: Optional[asyncio.Task] = None
+        self._user_stopped = False  # 标记是否为用户主动停止
 
     def compose(self) -> ComposeResult:
         """构建组件界面"""
-        # 当前歌曲信息面板
-        with Container(id="current_song_info", classes="section") as song_container:
-            song_container.border_title = "🎵 当前歌曲"
-            yield Static("未选择歌曲", id="song_name_display")
-        
-        # 实时播放信息面板 - 添加外层容器
-        with Container(id="realtime_info", classes="section") as realtime_container:
-            realtime_container.border_title = "📊 实时播放信息"
-            # 基本播放进度
-            yield ProgressBar(total=100, show_percentage=True, id="play_progress")
-            # 实时播放信息行
-            with Horizontal(classes="realtime_row"):
-                yield Static("进度: 0/0 小节", id="bar_progress")
-                yield Static("音符: —", id="current_note_display")
-                yield Static("按键: —", id="current_key_display")
-            with Horizontal(classes="realtime_row"):
-                yield Static("已播放: 00:00", id="elapsed_display")
-                yield Static("剩余: 00:00", id="remaining_display")
-                yield Static("状态: 停止", id="detailed_status")
+        # 合并的音乐播放器面板
+        with Container(id="music_player", classes="section") as player_container:
+            player_container.border_title = "🎵 音乐播放器"
+            
+            # 主要播放器区域 - 水平布局
+            with Horizontal(classes="player_main_row"):
+                # 左侧：专辑封面占位符
+                with Container(classes="album_cover"):
+                    yield Static("🎵", id="album_icon")
+                
+                # 中央：播放控制按钮
+                with Container(classes="player_controls"):
+                    with Horizontal(classes="control_buttons_row"):
+                        yield Button("►", id="play_btn", variant="primary", classes="player_btn main_play_btn")
+                        yield Button("◼", id="stop_btn", classes="player_btn")
+                        yield Button("↻", id="replay_btn", classes="player_btn")
+                
+                # 右侧：时间和状态信息
+                with Container(classes="player_info"):
+                    with Horizontal(classes="time_row"):
+                        yield Static("00:00", id="elapsed_display", classes="time_display")
+                        yield Static("/ 00:00", id="remaining_display", classes="time_display")
+                    yield Static("停止", id="detailed_status", classes="status_display")
+            
+            # 进度条 - 替换歌曲信息行的位置
+            yield ProgressBar(total=100, show_percentage=False, id="play_progress", classes="player_progress")
+            
+            # 歌曲信息行 - 移到进度条下方，更紧凑
+            with Horizontal(classes="song_info_row"):
+                yield Static("未选择歌曲", id="current_song_display", classes="song_title")
+                with Container(classes="extra_info"):
+                    yield Static("0/0", id="bar_progress", classes="bar_info")
+                    yield Static("—", id="current_note_display", classes="note_info")
+                    yield Static("—", id="current_key_display", classes="key_info")
 
-        # 播放控制按钮
-        with Container(id="play_controls", classes="section") as controls_container:
-            controls_container.border_title = "🎮 播放控制"
-            with Horizontal(classes="control_row"):
-                yield Button("▶️ 播放", id="play_btn", variant="primary")
-                yield Button("⏸️ 暂停", id="pause_btn", variant="default")
-                yield Button("⏹️ 停止", id="stop_btn", variant="default")
-                yield Button("🔄 重播", id="replay_btn", variant="default")
 
         # 播放参数设置
         with Container(id="unified_settings", classes="section") as settings_container:
@@ -195,31 +203,21 @@ class PlayControl(Container):
     def _update_controls_state(self) -> None:
         """更新控制按钮状态"""
         play_btn = self.query_one("#play_btn", Button)
-        pause_btn = self.query_one("#pause_btn", Button)
         stop_btn = self.query_one("#stop_btn", Button)
         replay_btn = self.query_one("#replay_btn", Button)
 
         if self.play_status == PlayStatus.STOPPED:
             play_btn.disabled = not self.current_song
-            pause_btn.disabled = True
             stop_btn.disabled = True
             replay_btn.disabled = not self.current_song
 
         elif self.play_status == PlayStatus.PLAYING:
             play_btn.disabled = True
-            pause_btn.disabled = False
-            stop_btn.disabled = False
-            replay_btn.disabled = False
-
-        elif self.play_status == PlayStatus.PAUSED:
-            play_btn.disabled = False
-            pause_btn.disabled = True
             stop_btn.disabled = False
             replay_btn.disabled = False
 
         elif self.play_status == PlayStatus.LOADING:
             play_btn.disabled = True
-            pause_btn.disabled = True
             stop_btn.disabled = True
             replay_btn.disabled = True
 
@@ -246,14 +244,14 @@ class PlayControl(Container):
 
     def _update_song_info(self) -> None:
         """更新歌曲信息显示"""
-        # 更新歌曲名称显示
         try:
-            song_display = self.query_one("#song_name_display", Static)
+            # 更新音乐播放器面板中的歌曲显示
+            current_song_display = self.query_one("#current_song_display", Static)
             if self.current_song:
-                song_display.update(self.current_song)
+                current_song_display.update(self.current_song)
                 self._analyze_current_song()
             else:
-                song_display.update("未选择歌曲")
+                current_song_display.update("未选择歌曲")
                 self._clear_analysis()
         except Exception:
             pass  # 如果组件未找到，忽略错误
@@ -313,8 +311,29 @@ class PlayControl(Container):
         if not self.current_song:
             return
 
+        # 如果已有播放任务在运行，先停止它并等待完全结束
+        if self.play_task and not self.play_task.done():
+            # 标记这是由新播放任务引起的取消，不是用户主动停止
+            self._user_stopped = False
+            self.play_task.cancel()
+            self.flute.stop_requested = True
+            
+            # 等待旧任务完全结束，避免时序竞争
+            try:
+                await self.play_task
+            except asyncio.CancelledError:
+                pass  # 预期的取消异常，忽略
+            except Exception:
+                pass  # 忽略其他异常
+            
+            # 确保任务引用已清理
+            self.play_task = None
+
         try:
             self.play_status = PlayStatus.LOADING
+            
+            # 重置停止请求标志
+            self.flute.stop_requested = False
             
             # 重置实时信息
             self._reset_realtime_info()
@@ -351,8 +370,11 @@ class PlayControl(Container):
             self.play_status = PlayStatus.PLAYING
             self.post_message(self.PlayStarted(self.current_song))
             
-            # 调用真实的播放逻辑
-            success = await self._real_play(bpm, ready_time)
+            # 创建播放任务并保存引用
+            self.play_task = asyncio.create_task(self._real_play(bpm, ready_time))
+            
+            # 等待播放完成
+            success = await self.play_task
             
             if success:
                 self.play_status = PlayStatus.STOPPED
@@ -363,11 +385,22 @@ class PlayControl(Container):
                 self.play_status = PlayStatus.ERROR
                 self._reset_realtime_info()
 
+        except asyncio.CancelledError:
+            # 任务被取消（暂停/停止）
+            self.play_status = PlayStatus.STOPPED
+            self.progress = 0
+            self._reset_realtime_info()
+            self.flute.stop_requested = True
+            # 只有用户主动停止时才发送停止消息，避免重复通知
+            if self.current_song and self._user_stopped:
+                self.post_message(self.PlayStopped(self.current_song))
         except Exception as e:
             self.play_status = PlayStatus.ERROR
             self._reset_realtime_info()
             if hasattr(self.app, 'notify'):
                 self.app.notify(f"播放失败: {str(e)}", severity="error")
+        finally:
+            self.play_task = None
 
     async def _real_play(self, bpm: int, ready_time: int) -> bool:
         """真实的播放过程"""
@@ -521,19 +554,17 @@ class PlayControl(Container):
         button_id = event.button.id
         
         if button_id == "play_btn":
-            if self.play_status == PlayStatus.PAUSED:
-                self.play_status = PlayStatus.PLAYING
-            else:
-                asyncio.create_task(self._start_play())
-        
-        elif button_id == "pause_btn":
-            if self.play_status == PlayStatus.PLAYING:
-                self.play_status = PlayStatus.PAUSED
-                self.post_message(self.PlayPaused(self.current_song or ""))
+            # 播放按钮：总是开始新的播放
+            self._user_stopped = False  # 重置用户停止标志
+            asyncio.create_task(self._start_play())
         
         elif button_id == "stop_btn":
+            # 停止按钮：停止播放
+            # 标记为用户主动停止
+            self._user_stopped = True
             if self.play_task:
                 self.play_task.cancel()
+                self.flute.stop_requested = True
             self.play_status = PlayStatus.STOPPED
             self.progress = 0
             self._reset_realtime_info()
@@ -543,6 +574,8 @@ class PlayControl(Container):
                 self.post_message(self.PlayStopped(self.current_song))
         
         elif button_id == "replay_btn":
+            # 重播按钮：重新开始播放
+            self._user_stopped = False  # 重置用户停止标志
             self.progress = 0
             asyncio.create_task(self._start_play())
 
@@ -596,39 +629,36 @@ class PlayControl(Container):
         status_map = {
             PlayStatus.STOPPED: "停止",
             PlayStatus.PLAYING: "播放中",
-            PlayStatus.PAUSED: "暂停",
             PlayStatus.LOADING: "加载中",
             PlayStatus.ERROR: "错误"
         }
-        status_text.update(f"状态: {status_map[status]}")
+        status_text.update(f"状态: {status_map.get(status, '未知')}")
         self._update_controls_state()
         
-        # 更新Postman样式的状态指示器
-        self._update_status_indicator(status, status_map[status])
+        # 更新音乐播放器样式的状态指示器
+        self._update_status_indicator(status, status_map.get(status, '未知'))
 
     def _update_status_indicator(self, status: PlayStatus, status_text: str) -> None:
-        """更新Postman样式的状态指示器"""
+        """更新音乐播放器样式的状态指示器"""
         try:
-            # 获取合并信息容器
-            info_container = self.query_one("#realtime_info", Container)
+            # 获取音乐播放器容器
+            player_container = self.query_one("#music_player", Container)
             
             # 移除旧的状态类
-            info_container.remove_class("status-stopped", "status-playing", "status-paused", "status-loading", "status-error")
+            player_container.remove_class("status-stopped", "status-playing", "status-loading", "status-error")
             
-            # 根据状态添加对应的CSS类，但不更新border_title中的状态
+            # 根据状态添加对应的CSS类
             if status == PlayStatus.PLAYING:
-                info_container.add_class("status-playing")
-            elif status == PlayStatus.PAUSED:
-                info_container.add_class("status-paused")
+                player_container.add_class("status-playing")
             elif status == PlayStatus.LOADING:
-                info_container.add_class("status-loading")
+                player_container.add_class("status-loading")
             elif status == PlayStatus.ERROR:
-                info_container.add_class("status-error")
+                player_container.add_class("status-error")
             else:  # STOPPED
-                info_container.add_class("status-stopped")
+                player_container.add_class("status-stopped")
             
-            # 保持border_title为固定的实时播放信息标题
-            info_container.border_title = "📊 实时播放信息"
+            # 保持border_title为固定的音乐播放器标题
+            player_container.border_title = "🎵 音乐播放器"
                 
         except Exception:
             # 如果更新失败，忽略错误
@@ -643,7 +673,7 @@ class PlayControl(Container):
         """监听当前小节变化"""
         try:
             bar_progress = self.query_one("#bar_progress", Static)
-            bar_progress.update(f"进度: {bar}/{self.total_bars} 小节")
+            bar_progress.update(f"{bar}/{self.total_bars}")
         except Exception:
             pass
             
@@ -651,7 +681,7 @@ class PlayControl(Container):
         """监听当前音符变化"""
         try:
             note_display = self.query_one("#current_note_display", Static)
-            note_display.update(f"音符: {note}")
+            note_display.update(note)
         except Exception:
             pass
             
@@ -659,7 +689,7 @@ class PlayControl(Container):
         """监听当前按键变化"""
         try:
             key_display = self.query_one("#current_key_display", Static)
-            key_display.update(f"按键: {key}")
+            key_display.update(key)
         except Exception:
             pass
             
@@ -667,7 +697,7 @@ class PlayControl(Container):
         """监听已播放时间变化"""
         try:
             elapsed_display = self.query_one("#elapsed_display", Static)
-            elapsed_display.update(f"已播放: {time}")
+            elapsed_display.update(time)
         except Exception:
             pass
             
@@ -675,7 +705,7 @@ class PlayControl(Container):
         """监听剩余时间变化"""
         try:
             remaining_display = self.query_one("#remaining_display", Static)
-            remaining_display.update(f"剩余: {time}")
+            remaining_display.update(f"/ {time}")
         except Exception:
             pass
 

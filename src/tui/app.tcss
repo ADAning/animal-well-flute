@@ -79,6 +79,8 @@ TabPane {
 /* 按钮样式增强 */
 Button {
     text-style: bold;
+    padding: 0 1;
+    border: none;
 }
 
 Button:hover {
@@ -99,7 +101,7 @@ Button.-primary:hover {
 /* Header 和 Footer 增强 */
 Header {
     dock: top;
-    height: 2;
+    height: 1;
 }
 
 Footer {
@@ -113,7 +115,7 @@ TabbedContent {
 }
 
 ContentTabs {
-    height: 3;
+    height: 2;
 }
 
 /* 通知样式 */
@@ -260,6 +262,165 @@ PlayControl {
     padding: 1;
 }
 
+/* 音乐播放器样式 */
+#music_player {
+    height: 7;
+    background: $surface;
+    border: round $warning 60%;
+    border-title-color: $warning;
+    border-title-align: left;
+    border-title-style: bold;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+/* 播放器主行 - 水平布局 */
+.player_main_row {
+    height: 2;
+    align: center middle;
+    margin: 0 0 1 0;
+}
+
+/* 专辑封面区域 */
+.album_cover {
+    width: 5;
+    height: 2;
+    background: $surface-darken-1;
+    border: round $primary;
+    align: center middle;
+}
+
+#album_icon {
+    text-align: center;
+    content-align: center middle;
+    color: $primary;
+    text-style: bold;
+}
+
+/* 播放器控制区域 */
+.player_controls {
+    width: 1fr;
+    height: 2;
+    align: center middle;
+}
+
+.control_buttons_row {
+    height: 2;
+    align: center middle;
+}
+
+.player_btn {
+    margin: 0 1;
+    width: 4;
+    height: 1;
+    text-style: bold;
+    content-align: center middle;
+}
+
+.main_play_btn {
+    width: 5;
+    background: $primary;
+}
+
+.main_play_btn:hover {
+    background: $primary-darken-1;
+}
+
+/* 播放器信息区域 */
+.player_info {
+    width: 12;
+    height: 2;
+    align: center middle;
+}
+
+.time_row {
+    height: 1;
+    align: center middle;
+    margin: 0 0 1 0;
+}
+
+.time_display {
+    height: 1;
+    text-align: center;
+    content-align: center middle;
+    color: $text;
+    text-style: bold;
+    width: 1fr;
+}
+
+.status_display {
+    height: 1;
+    text-align: center;
+    content-align: center middle;
+    color: $success;
+    text-style: bold;
+}
+
+/* 播放器进度条 */
+.player_progress {
+    height: 1;
+    margin: 0 5 1 5;  /* 左右边距与播放控制区域对齐 */
+}
+
+/* 歌曲信息行 */
+.song_info_row {
+    height: 1;
+    align: center middle;
+}
+
+.song_title {
+    width: 1fr;
+    height: 1;
+    text-align: left;
+    content-align: center middle;
+    color: $primary;
+    text-style: bold;
+    margin: 0 1 0 0;
+}
+
+.extra_info {
+    width: 20;
+    height: 1;
+    align: center middle;
+}
+
+.bar_info, .note_info, .key_info {
+    width: 6;
+    height: 1;
+    text-align: center;
+    content-align: center middle;
+    background: $surface-darken-1;
+    border: round $accent;
+    margin: 0 1;
+    color: $text;
+}
+
+/* 音乐播放器状态指示器 */
+#music_player.status-playing {
+    border: round $success 80%;
+    border-title-color: $success;
+}
+
+#music_player.status-paused {
+    border: round $warning 80%;
+    border-title-color: $warning;
+}
+
+#music_player.status-loading {
+    border: round $primary 80%;
+    border-title-color: $primary;
+}
+
+#music_player.status-error {
+    border: round $error 80%;
+    border-title-color: $error;
+}
+
+#music_player.status-stopped {
+    border: round $surface-lighten-1 60%;
+    border-title-color: $text-muted;
+}
+
 /* 合并面板内的组件样式 */
 #combined_info #song_title {
     height: 1;
@@ -296,7 +457,7 @@ PlayControl {
 }
 
 #unified_settings {
-    height: 8;
+    height: 6;
     background: $surface;
     border: round $accent;
     padding: 1;
@@ -304,18 +465,18 @@ PlayControl {
 }
 
 .unified_settings_row {
-    height: 3;
+    height: 2;
     align: center middle;
 }
 
 .manual_offset_row {
-    height: 3;
+    height: 2;
     align: left middle;
     margin: 0 0 1 0;
 }
 
 .setting_label {
-    height: 3;
+    height: 2;
     width: 10;
     text-align: right;
     content-align: center middle;
@@ -326,25 +487,25 @@ PlayControl {
 .number_input {
     width: 9;
     margin: 0 1;
-    height: 3;
+    height: 2;
     content-align: center middle;
 }
 
 .ready_time_input {
-    height: 3;
+    height: 2;
 }
 
 .strategy_select {
     width: 12;
     margin: 0 1;
-    height: 3;
+    height: 2;
     content-align: center middle;
 }
 
 .manual_offset {
     width: 20;
     margin: 0 1;
-    height: 3;
+    height: 2;
     content-align: center middle;
 }
 

@@ -263,10 +263,6 @@ class AnimalWellFluteApp(App):
         
         # 调试日志
         self.log.debug(f"Tab switched from '{old_tab}' to '{event.tab.id}'")
-        
-        # 强制刷新绑定以更新footer显示
-        self.refresh_bindings()
-        self.log.debug("Bindings refreshed after tab switch")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """处理按钮点击事件"""
@@ -342,7 +338,7 @@ class AnimalWellFluteApp(App):
             play_control = self.query_one(PlayControl)
             play_control.set_current_song(song_name, auto_play=True)
             
-            self.notify(f"正在播放: {song_name}")
+            # 通知将由PlayControl的消息处理器发送，避免重复
             return True
             
         except Exception as e:
@@ -368,7 +364,7 @@ class AnimalWellFluteApp(App):
         """处理歌曲选择消息"""
         self.current_song = message.song_name
         self._update_status_displays()
-        self.notify(f"已选择歌曲: {message.song_name}")
+        # 移除选择通知，避免与播放通知重复
 
     def on_song_browser_play_requested(self, message: SongBrowser.PlayRequested) -> None:
         """处理播放请求消息"""
@@ -544,6 +540,10 @@ def run_tui_app():
     """启动 TUI 应用程序"""
     app = AnimalWellFluteApp()
     app.run()
+
+def run_tui():
+    """启动 TUI 应用程序 (别名)"""
+    return run_tui_app()
 
 
 if __name__ == "__main__":
