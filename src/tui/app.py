@@ -5,7 +5,7 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Header, Footer, Button, Static, TabbedContent, TabPane
 from textual.binding import Binding
 from textual.reactive import reactive
-from typing import Optional
+from typing import Optional, Union
 import asyncio
 
 from ..services.song_service_base import SongServiceBase
@@ -31,12 +31,16 @@ class AnimalWellFluteApp(App):
         Binding("ctrl+c", "quit", "退出", priority=True),
         Binding("f1", "help", "帮助"),
         Binding("f2", "toggle_dark", "切换主题"),
-        # 歌曲浏览器快捷键现在是动态管理的，不在这里定义
+        # 上下文相关的绑定（通过check_action动态控制显示）
+        Binding("enter", "context_enter", "执行"),
+        Binding("space", "context_space", "分析"),
+        Binding("i", "context_details", "详情"),
     ]
     
     # 响应式状态
     current_song: reactive[Optional[str]] = reactive(None)
     playing_status: reactive[str] = reactive("stopped")
+    current_tab: reactive[str] = reactive("dashboard")  # 追踪当前活跃标签
     
     def __init__(self):
         """初始化应用程序"""
@@ -129,40 +133,140 @@ class AnimalWellFluteApp(App):
             except Exception:
                 pass
 
-    def _is_browser_active(self) -> bool:
-        """检查当前是否在歌曲浏览器标签页"""
+    # 上下文相关的统一动作方法
+    def action_context_enter(self) -> None:
+        """上下文相关的Enter键动作"""
+        current_tab = self._get_active_tab()
+        
+        if current_tab == "browser":
+            # 浏览器页面：播放选中的歌曲
+            self.action_browser_play()
+        elif current_tab == "player":
+            # 播放控制页面：演奏操作（播放/暂停）
+            self._handle_player_play_action()
+
+    def action_context_space(self) -> None:
+        """上下文相关的Space键动作"""
+        current_tab = self._get_active_tab()
+        
+        if current_tab == "browser":
+            # 浏览器页面：分析选中的歌曲
+            self.action_browser_analyze()
+        elif current_tab == "player":
+            # 播放控制页面：分析当前歌曲
+            self._handle_player_analyze_action()
+
+    def action_context_details(self) -> None:
+        """上下文相关的i键动作（详情）"""
+        current_tab = self._get_active_tab()
+        
+        if current_tab == "browser":
+            # 浏览器页面：显示歌曲详情
+            self.action_browser_details()
+
+    def _handle_player_play_action(self) -> None:
+        """处理播放控制页面的演奏动作"""
+        try:
+            play_control = self.query_one(PlayControl)
+            # 根据当前播放状态决定执行播放还是暂停
+            if play_control.play_status.value == "stopped":
+                # 停止状态：开始播放
+                if self.current_song:
+                    play_btn = play_control.query_one("#play_btn")
+                    if not play_btn.disabled:
+                        play_btn.action_press()
+                else:
+                    self.notify("请先选择要播放的歌曲")
+            elif play_control.play_status.value == "playing":
+                # 播放中：暂停
+                pause_btn = play_control.query_one("#pause_btn")
+                if not pause_btn.disabled:
+                    pause_btn.action_press()
+            elif play_control.play_status.value == "paused":
+                # 暂停中：恢复播放
+                play_btn = play_control.query_one("#play_btn")
+                if not play_btn.disabled:
+                    play_btn.action_press()
+        except Exception as e:
+            self.notify(f"演奏操作失败: {str(e)}", severity="error")
+
+    def _handle_player_analyze_action(self) -> None:
+        """处理播放控制页面的分析动作"""
+        if self.current_song:
+            # 切换到分析工具标签页并开始分析
+            self.query_one(TabbedContent).active = "analyzer"
+            try:
+                analysis_panel = self.query_one(AnalysisPanel)
+                analysis_panel.set_song_for_analysis(self.current_song)
+                self.notify(f"正在分析: {self.current_song}")
+            except Exception as e:
+                self.notify(f"分析失败: {str(e)}", severity="error")
+        else:
+            self.notify("请先选择要分析的歌曲")
+
+    def _get_active_tab(self) -> Optional[str]:
+        """获取当前活跃的标签页ID"""
+        # 优先使用reactive状态，fallback到直接查询
+        if hasattr(self, 'current_tab') and self.current_tab:
+            return self.current_tab
         try:
             tabbed_content = self.query_one(TabbedContent)
-            return tabbed_content.active == "browser"
+            active_tab = tabbed_content.active
+            # 同步状态
+            if hasattr(self, 'current_tab'):
+                self.current_tab = active_tab
+            return active_tab
         except Exception:
-            return False
+            return None
+
+    def _is_browser_active(self) -> bool:
+        """检查当前是否在歌曲浏览器标签页"""
+        return self._get_active_tab() == "browser"
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> Union[bool, None]:
+        """检查动作是否可以执行，控制绑定的显示和启用状态"""
+        # 使用reactive变量而不是查询DOM
+        current_tab = self.current_tab
+        
+        # 调试日志
+        self.log.debug(f"check_action called: action={action}, current_tab={current_tab}")
+        
+        if action == "context_enter":
+            # Enter键：浏览器显示"播放"，播放控制显示"演奏"
+            if current_tab == "browser":
+                return True  # 显示"播放"
+            elif current_tab == "player":
+                return True  # 显示"演奏"  
+            else:
+                return False  # 其他页面隐藏
+        elif action == "context_space":
+            # Space键：浏览器和播放控制页面都显示"分析"
+            if current_tab in ["browser", "player"]:
+                return True
+            else:
+                return False  # 其他页面隐藏
+        elif action == "context_details":
+            # i键：只在浏览器页面显示"详情"
+            if current_tab == "browser":
+                return True
+            else:
+                return False  # 其他页面隐藏
+        
+        # 其他动作默认允许
+        return True
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
-        """处理标签页切换事件，动态更新快捷键显示"""
-        # 检查是否在浏览器标签页
-        is_browser_active = (event.tab.id == "browser")
+        """处理标签页切换事件"""
+        # 更新当前标签状态
+        old_tab = self.current_tab
+        self.current_tab = event.tab.id
         
-        # 使用 Textual 的动态绑定机制
-        # 先移除现有的浏览器绑定
-        try:
-            self.unbind("enter")
-            self.unbind("space") 
-            self.unbind("i")
-        except Exception:
-            pass  # 如果绑定不存在，忽略错误
+        # 调试日志
+        self.log.debug(f"Tab switched from '{old_tab}' to '{event.tab.id}'")
         
-        # 如果在浏览器标签页，重新添加绑定
-        if is_browser_active:
-            self.bind("enter", "browser_play", "播放", priority=True)
-            self.bind("space", "browser_analyze", "分析", priority=True)
-            self.bind("i", "browser_details", "详情", priority=True)
-        
-        # 刷新 Footer 显示
-        try:
-            footer = self.query_one(Footer)
-            footer.refresh()
-        except Exception:
-            pass
+        # 强制刷新绑定以更新footer显示
+        self.refresh_bindings()
+        self.log.debug("Bindings refreshed after tab switch")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """处理按钮点击事件"""

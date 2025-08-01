@@ -76,12 +76,16 @@ class PlayControl(Container):
 
     def compose(self) -> ComposeResult:
         """构建组件界面"""
-        # 合并的当前歌曲和实时播放信息面板
-        with Container(id="combined_info", classes="section") as info_container:
-            info_container.border_title = "🎵 当前歌曲"
-            # 基本歌曲信息行
+        # 当前歌曲信息面板
+        with Container(id="current_song_info", classes="section") as song_container:
+            song_container.border_title = "🎵 当前歌曲"
+            yield Static("未选择歌曲", id="song_name_display")
+        
+        # 实时播放信息面板 - 添加外层容器
+        with Container(id="realtime_info", classes="section") as realtime_container:
+            realtime_container.border_title = "📊 实时播放信息"
+            # 基本播放进度
             yield ProgressBar(total=100, show_percentage=True, id="play_progress")
-            yield Static("🔄 状态: 停止", id="play_status_text")
             # 实时播放信息行
             with Horizontal(classes="realtime_row"):
                 yield Static("进度: 0/0 小节", id="bar_progress")
@@ -242,16 +246,17 @@ class PlayControl(Container):
 
     def _update_song_info(self) -> None:
         """更新歌曲信息显示"""
-        info_container = self.query_one("#combined_info", Container)
-        
-        if self.current_song:
-            # 动态更新边框标题
-            info_container.border_title = f"🎵 当前歌曲: {self.current_song}"
-            self._analyze_current_song()
-        else:
-            # 恢复默认边框标题
-            info_container.border_title = "🎵 当前歌曲"
-            self._clear_analysis()
+        # 更新歌曲名称显示
+        try:
+            song_display = self.query_one("#song_name_display", Static)
+            if self.current_song:
+                song_display.update(self.current_song)
+                self._analyze_current_song()
+            else:
+                song_display.update("未选择歌曲")
+                self._clear_analysis()
+        except Exception:
+            pass  # 如果组件未找到，忽略错误
 
     def _analyze_current_song(self) -> None:
         """分析当前歌曲"""
@@ -413,12 +418,12 @@ class PlayControl(Container):
                 if self.play_status != PlayStatus.PLAYING:
                     return False
                 
-                status_text = self.query_one("#play_status_text", Static)
+                status_text = self.query_one("#detailed_status", Static)
                 status_text.update(f"状态: 准备中... {i}")
                 await asyncio.sleep(1)
 
             # 开始真实播放
-            status_text = self.query_one("#play_status_text", Static)
+            status_text = self.query_one("#detailed_status", Static)
             status_text.update("状态: 播放中...")
             
             # 计算节拍间隔
@@ -587,7 +592,7 @@ class PlayControl(Container):
 
     def watch_play_status(self, status: PlayStatus) -> None:
         """监听播放状态变化"""
-        status_text = self.query_one("#play_status_text", Static)
+        status_text = self.query_one("#detailed_status", Static)
         status_map = {
             PlayStatus.STOPPED: "停止",
             PlayStatus.PLAYING: "播放中",
@@ -595,7 +600,7 @@ class PlayControl(Container):
             PlayStatus.LOADING: "加载中",
             PlayStatus.ERROR: "错误"
         }
-        status_text.update(f"🔄 状态: {status_map[status]}")
+        status_text.update(f"状态: {status_map[status]}")
         self._update_controls_state()
         
         # 更新Postman样式的状态指示器
@@ -605,29 +610,25 @@ class PlayControl(Container):
         """更新Postman样式的状态指示器"""
         try:
             # 获取合并信息容器
-            info_container = self.query_one("#combined_info", Container)
+            info_container = self.query_one("#realtime_info", Container)
             
             # 移除旧的状态类
             info_container.remove_class("status-stopped", "status-playing", "status-paused", "status-loading", "status-error")
             
-            # 根据状态添加对应的CSS类和更新border_title
+            # 根据状态添加对应的CSS类，但不更新border_title中的状态
             if status == PlayStatus.PLAYING:
                 info_container.add_class("status-playing")
-                current_song = self.current_song or "未选择歌曲"
-                info_container.border_title = f"🎵 当前歌曲 [bold green]● {status_text}[/]"
             elif status == PlayStatus.PAUSED:
                 info_container.add_class("status-paused")
-                current_song = self.current_song or "未选择歌曲"
-                info_container.border_title = f"🎵 当前歌曲 [bold yellow]⏸ {status_text}[/]"
             elif status == PlayStatus.LOADING:
                 info_container.add_class("status-loading")
-                info_container.border_title = f"🎵 当前歌曲 [bold blue]⏳ {status_text}[/]"
             elif status == PlayStatus.ERROR:
                 info_container.add_class("status-error")
-                info_container.border_title = f"🎵 当前歌曲 [bold red]❌ {status_text}[/]"
             else:  # STOPPED
                 info_container.add_class("status-stopped")
-                info_container.border_title = f"🎵 当前歌曲 [dim]⏹ {status_text}[/]"
+            
+            # 保持border_title为固定的实时播放信息标题
+            info_container.border_title = "📊 实时播放信息"
                 
         except Exception:
             # 如果更新失败，忽略错误
@@ -802,8 +803,8 @@ class PlayControl(Container):
             self.progress = progress
             
             # 更新状态显示
-            status_text = self.query_one("#play_status_text", Static)
-            status_text.update(f"🔄 状态: 播放中 ({current_bar}/{total_bars})")
+            status_text = self.query_one("#detailed_status", Static)
+            status_text.update(f"状态: 播放中 ({current_bar}/{total_bars})")
             
         except Exception:
             # 静默忽略UI更新错误
