@@ -6,6 +6,7 @@ from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.message import Message
 from typing import Optional, Dict
+import os
 
 from ...config import get_app_config, save_app_config
 from ...utils.logger import setup_logging, get_logger
@@ -22,6 +23,12 @@ class SettingsPanel(Container):
         def __init__(self, setting_name: str, new_value) -> None:
             self.setting_name = setting_name
             self.new_value = new_value
+            super().__init__()
+    
+    class ImportRequested(Message):
+        """导入请求消息"""
+        def __init__(self, import_type: str) -> None:
+            self.import_type = import_type  # "image", "directory"
             super().__init__()
 
     # 响应式属性
@@ -93,6 +100,15 @@ class SettingsPanel(Container):
                         id="songs_dir_input",
                         classes="path_input"
                     )
+                
+                # 导入功能
+                yield Static("简谱导入", classes="subsection_title")
+                with Horizontal(classes="setting_row"):
+                    yield Button("📸 导入简谱图片", id="import_image_btn", variant="success")
+                    yield Button("📁 批量导入目录", id="import_dir_btn", variant="default")
+                with Horizontal(classes="setting_row"):
+                    yield Static("AI服务状态:", classes="setting_label")
+                    yield Static("检查中...", id="ai_status_display", classes="status_text")
 
             # 操作按钮
             with Container(id="settings_actions"):
@@ -108,6 +124,7 @@ class SettingsPanel(Container):
     def on_mount(self) -> None:
         """组件挂载时初始化"""
         self._update_ui_from_settings()
+        self._check_ai_status()
 
     def _load_current_settings(self) -> None:
         """加载当前设置"""
@@ -227,6 +244,10 @@ class SettingsPanel(Container):
             self._reset_settings()
         elif button_id == "open_config_btn":
             self._open_config_file()
+        elif button_id == "import_image_btn":
+            self.post_message(self.ImportRequested("image"))
+        elif button_id == "import_dir_btn":
+            self.post_message(self.ImportRequested("directory"))
 
     def on_switch_changed(self, event: Switch.Changed) -> None:
         """处理开关变化"""
@@ -252,6 +273,25 @@ class SettingsPanel(Container):
         """处理选择器变化"""
         if event.select.id == "log_level_select":
             self.log_level = event.value
+
+    def _check_ai_status(self) -> None:
+        """检查AI服务状态"""
+        try:
+            ai_status_display = self.query_one("#ai_status_display", Static)
+            
+            # 检查环境变量中的API密钥
+            google_key = os.getenv("GOOGLE_API_KEY")
+            ark_key = os.getenv("ARK_API_KEY")
+            
+            if google_key:
+                ai_status_display.update("✅ Gemini可用")
+            elif ark_key:
+                ai_status_display.update("✅ Doubao可用")
+            else:
+                ai_status_display.update("❌ 未配置API密钥")
+                
+        except Exception:
+            pass
 
     # 响应式属性监听器
     def watch_dark_mode(self, dark_mode: bool) -> None:

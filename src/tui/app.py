@@ -17,6 +17,7 @@ from .components.analysis_panel import AnalysisPanel
 from .components.settings_panel import SettingsPanel
 from .components.image_import_dialog import ImageImportDialog
 from .components.song_details_dialog import SongDetailsDialog
+from .components.visualizer_dashboard import VisualizerDashboard
 
 
 class AnimalWellFluteApp(App):
@@ -59,21 +60,9 @@ class AnimalWellFluteApp(App):
         yield Header(show_clock=True)
         
         with TabbedContent(initial="dashboard"):
-            # 主仪表板
+            # 动态可视化仪表板
             with TabPane("仪表板", id="dashboard"):
-                yield Container(
-                    Static("🎵 欢迎使用 Animal Well Flute TUI", id="welcome"),
-                    Horizontal(
-                        Button("🎵 播放歌曲", id="play_btn", variant="primary"),
-                        Button("🎼 分析歌曲", id="analyze_btn"),
-                        Button("📋 歌曲列表", id="list_btn"),
-                        Button("📸 导入简谱", id="import_btn"),
-                        classes="button_row"
-                    ),
-                    Static("当前歌曲: 无", id="current_song_display"),
-                    Static("播放状态: 停止", id="play_status_display"),
-                    id="dashboard_content"
-                )
+                yield VisualizerDashboard(self.song_service)
             
             # 歌曲浏览器
             with TabPane("歌曲浏览", id="browser"):
@@ -266,16 +255,9 @@ class AnimalWellFluteApp(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """处理按钮点击事件"""
-        button_id = event.button.id
-        
-        if button_id == "play_btn":
-            self._handle_play_action()
-        elif button_id == "analyze_btn":
-            self._handle_analyze_action()
-        elif button_id == "list_btn":
-            self._handle_list_action()
-        elif button_id == "import_btn":
-            self._handle_import_action()
+        # 现在主要的按钮都在各自的组件中处理
+        # 这里只保留必要的全局按钮处理
+        pass
 
     def _handle_play_action(self):
         """处理播放动作"""
@@ -314,6 +296,36 @@ class AnimalWellFluteApp(App):
         # 打开图片导入对话框
         self.push_screen(ImageImportDialog())
     
+    def navigate_to_player(self, song_name: str, switch_tab: bool = True) -> bool:
+        """导航到播放控制页面但不自动播放
+        
+        Args:
+            song_name: 要设置的歌曲名称
+            switch_tab: 是否自动切换到播放控制标签页
+            
+        Returns:
+            bool: 是否成功设置歌曲
+        """
+        try:
+            # 更新当前歌曲状态
+            self.current_song = song_name
+            self.playing_status = "stopped"
+            self._update_status_displays()
+            
+            # 切换到播放控制标签页（如果需要）
+            if switch_tab:
+                self.query_one(TabbedContent).active = "player"
+            
+            # 获取播放控制组件并设置歌曲，但不自动播放
+            play_control = self.query_one(PlayControl)
+            play_control.set_current_song(song_name, auto_play=False)
+            
+            return True
+            
+        except Exception as e:
+            self.notify(f"设置歌曲失败: {str(e)}", severity="error")
+            return False
+
     def start_playback(self, song_name: str, switch_tab: bool = True) -> bool:
         """统一的播放启动方法
         
@@ -364,12 +376,24 @@ class AnimalWellFluteApp(App):
         """处理歌曲选择消息"""
         self.current_song = message.song_name
         self._update_status_displays()
-        # 移除选择通知，避免与播放通知重复
+        
+        # 同步到播放控制组件，但不自动播放
+        try:
+            play_control = self.query_one(PlayControl)
+            play_control.set_current_song(message.song_name, auto_play=False)
+            
+            # 验证设置是否成功
+            if play_control.current_song == message.song_name:
+                self.notify(f"已选择歌曲: {message.song_name}", timeout=2)
+            else:
+                self.notify(f"歌曲设置可能失败，请重试", severity="warning", timeout=3)
+        except Exception as e:
+            self.notify(f"设置歌曲失败: {str(e)}", severity="error")
 
     def on_song_browser_play_requested(self, message: SongBrowser.PlayRequested) -> None:
         """处理播放请求消息"""
-        # 使用统一的播放方法
-        self.start_playback(message.song_name, switch_tab=True)
+        # 导航到播放控制页面但不自动播放
+        self.navigate_to_player(message.song_name, switch_tab=True)
 
     def on_song_browser_analyze_requested(self, message: SongBrowser.AnalyzeRequested) -> None:
         """处理分析请求消息"""
@@ -439,7 +463,7 @@ class AnimalWellFluteApp(App):
 
     def on_song_details_dialog_play_requested(self, message: SongDetailsDialog.PlayRequested) -> None:
         """处理歌曲详情对话框的播放请求"""
-        self.start_playback(message.song_name, switch_tab=True)
+        self.navigate_to_player(message.song_name, switch_tab=True)
 
     def on_song_details_dialog_analyze_requested(self, message: SongDetailsDialog.AnalyzeRequested) -> None:
         """处理歌曲详情对话框的分析请求"""
@@ -455,6 +479,27 @@ class AnimalWellFluteApp(App):
         except Exception as e:
             self.notify(f"设置分析歌曲失败: {str(e)}", severity="error")
 
+    def on_visualizer_dashboard_quick_play_requested(self, message: VisualizerDashboard.QuickPlayRequested) -> None:
+        """处理可视化仪表盘的快速操作请求"""
+        action = message.action
+        
+        if action == "random":
+            # 随机播放功能
+            self.query_one(TabbedContent).active = "browser"
+            self.notify("切换到歌曲浏览器，选择随机歌曲")
+        elif action == "favorite":
+            # 收藏夹功能（待实现）
+            self.query_one(TabbedContent).active = "browser"
+            self.notify("切换到歌曲浏览器，查看收藏夹")
+        elif action == "player":
+            # 播放控制页面
+            if self.current_song:
+                self.query_one(TabbedContent).active = "player"
+                self.notify(f"切换到播放控制: {self.current_song}")
+            else:
+                self.query_one(TabbedContent).active = "browser"
+                self.notify("请先选择要播放的歌曲")
+    
     def on_settings_panel_settings_changed(self, message: SettingsPanel.SettingsChanged) -> None:
         """处理设置变更消息"""
         setting_name = message.setting_name
@@ -467,26 +512,29 @@ class AnimalWellFluteApp(App):
             self.notify("所有设置已保存并应用", timeout=3)
         else:
             self.notify(f"设置已更新: {setting_name}", timeout=3)
+    
+    def on_settings_panel_import_requested(self, message: SettingsPanel.ImportRequested) -> None:
+        """处理设置面板的导入请求"""
+        import_type = message.import_type
+        
+        if import_type == "image":
+            # 显示图片导入对话框
+            self.push_screen(ImageImportDialog())
+            self.notify("打开图片导入对话框")
+        elif import_type == "directory":
+            # 显示目录选择提示
+            self.notify("目录批量导入功能：请将简谱图片放在指定文件夹中", timeout=5)
+            # 可以在这里添加目录选择逻辑
 
     def _update_status_displays(self):
-        """更新状态显示"""
+        """更新可视化仪表盘状态显示"""
         try:
-            current_song_widget = self.query_one("#current_song_display")
-            play_status_widget = self.query_one("#play_status_display")
-            
-            current_song_text = f"当前歌曲: {self.current_song or '无'}"
-            play_status_text = f"播放状态: {self._get_status_text()}"
-            
-            current_song_widget.update(current_song_text)
-            play_status_widget.update(play_status_text)
-            
-            # 更新欢迎文本，提供操作提示
-            welcome_widget = self.query_one("#welcome")
-            if self.current_song:
-                welcome_text = f"🎵 已选择 {self.current_song} - 点击播放按钮开始演奏"
-            else:
-                welcome_text = "🎵 欢迎使用 Animal Well Flute TUI - 点击歌曲列表选择歌曲"
-            welcome_widget.update(welcome_text)
+            # 更新可视化仪表盘的状态
+            visualizer = self.query_one(VisualizerDashboard)
+            if visualizer:
+                # 同步当前歌曲和播放状态
+                visualizer.current_song = self.current_song
+                visualizer.play_status = self.playing_status
             
         except Exception:
             pass  # 如果更新失败，忽略错误

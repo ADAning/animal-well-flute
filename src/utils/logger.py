@@ -51,17 +51,27 @@ def setup_logging(level: str = "INFO", tui_mode: bool = False) -> None:
     
     if tui_mode:
         # TUI模式：完全禁用日志输出到控制台
+        # 设置非常高的日志级别，基本禁用所有日志
+        root_logger.setLevel(logging.CRITICAL)
+        
         # 使用NullHandler完全静默
         null_handler = logging.NullHandler()
         root_logger.addHandler(null_handler)
         
-        # 可选：如果需要调试，可以同时输出到文件
+        # 强制所有现有的logger也使用这个配置
+        for name in logging.Logger.manager.loggerDict:
+            logger_instance = logging.getLogger(name)
+            logger_instance.setLevel(logging.CRITICAL)
+            logger_instance.propagate = False  # 阻止传播到父logger
+        
+        # 可选：如果需要调试，可以同时输出到文件（但设置更高的级别）
         try:
             from pathlib import Path
             log_dir = Path("logs")
             log_dir.mkdir(exist_ok=True)
             
             file_handler = logging.FileHandler(log_dir / "tui.log", encoding='utf-8')
+            file_handler.setLevel(logging.ERROR)  # 只记录错误
             formatter = logging.Formatter(
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                 datefmt="%Y-%m-%d %H:%M:%S"

@@ -44,13 +44,18 @@ class AutoFlute:
         blow_key: str = "x",
         keyboard: Optional[Controller] = None,
         progress_callback: Optional[callable] = None,
+        tui_mode: bool = False,
     ):
         self.keyboard = keyboard or Controller()
         self.blow_key = blow_key
         self.stop_requested = False
         self.listener = None
         self.progress_callback = progress_callback
-        logger.info(f"AutoFlute initialized with blow_key={blow_key}")
+        self.tui_mode = tui_mode
+        
+        # TUI模式下减少日志输出
+        if not tui_mode:
+            logger.info(f"AutoFlute initialized with blow_key={blow_key}")
 
     def _convert_key(self, key_str: str):
         """将字符串按键转换为pynput可用的按键对象"""
@@ -59,7 +64,8 @@ class AutoFlute:
     def _on_press(self, key):
         """处理按键事件"""
         if key == Key.esc:
-            logger.info("ESC key detected, stopping playback...")
+            if not self.tui_mode:
+                logger.info("ESC key detected, stopping playback...")
             self.stop_requested = True
             return False  # 停止监听
 
@@ -68,7 +74,8 @@ class AutoFlute:
         self.stop_requested = False
         self.listener = Listener(on_press=self._on_press)
         self.listener.start()
-        logger.info("ESC key listener started - press ESC to stop playback")
+        if not self.tui_mode:
+            logger.info("ESC key listener started - press ESC to stop playback")
 
     def _stop_listener(self):
         """停止ESC键监听"""
@@ -143,7 +150,8 @@ class AutoFlute:
         if self.stop_requested:
             return False
 
-        logger.info(f"Playing bar with {len(bar)} notes")
+        if not self.tui_mode:
+            logger.info(f"Playing bar with {len(bar)} notes")
 
         for note in bar:
             if not self.play_physical_note(note, beat_interval):
@@ -159,7 +167,8 @@ class AutoFlute:
 
     def play_song(self, bars: List[List[PhysicalNote]], beat_interval: float) -> None:
         """演奏整首乐曲"""
-        logger.info(f"Starting to play song with {len(bars)} bars")
+        if not self.tui_mode:
+            logger.info(f"Starting to play song with {len(bars)} bars")
 
         # 启动ESC键监听
         self._start_stop_listener()
@@ -169,7 +178,8 @@ class AutoFlute:
                 if self.stop_requested:
                     break
 
-                logger.info(f"Playing bar {i}/{len(bars)}")
+                if not self.tui_mode:
+                    logger.info(f"Playing bar {i}/{len(bars)}")
                 
                 # 通知进度回调
                 if self.progress_callback:
@@ -181,10 +191,11 @@ class AutoFlute:
                 if not self.play_bar(bar, beat_interval):
                     break
 
-            if self.stop_requested:
-                logger.info("Song stopped by user")
-            else:
-                logger.info("Song finished")
+            if not self.tui_mode:
+                if self.stop_requested:
+                    logger.info("Song stopped by user")
+                else:
+                    logger.info("Song finished")
         finally:
             # 停止ESC键监听
             self._stop_listener()

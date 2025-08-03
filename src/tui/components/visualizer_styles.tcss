@@ -1,0 +1,340 @@
+/* 动态音乐可视化仪表盘样式 */
+
+/* 主标题区域 */
+.visualizer_header {
+    height: 4;
+    background: $surface-darken-2;
+    border: round $primary 80%;
+    border-title-color: $primary;
+    border-title-align: center;
+    text-align: center;
+    content-align: center middle;
+    margin: 0 0 1 0;
+}
+
+#main_title {
+    height: 2;
+    text-style: bold;
+    color: $primary;
+    text-align: center;
+    content-align: center middle;
+}
+
+#subtitle {
+    height: 1;
+    color: $text-muted;
+    text-align: center;
+    content-align: center middle;
+    text-style: italic;
+}
+
+/* 主内容区域 */
+.visualizer_main {
+    height: 1fr;
+    background: $surface;
+    padding: 1;
+}
+
+/* 当前播放大卡片 */
+.current_playing_card {
+    height: 8;
+    background: $surface-darken-1;
+    border: round $success 70%;
+    border-title: "🎼 正在播放";
+    border-title-color: $success;
+    border-title-align: left;
+    border-title-style: bold;
+    padding: 1;
+    margin: 0 0 1 0;
+}
+
+#current_song_display {
+    height: 2;
+    text-style: bold;
+    color: $success;
+    text-align: center;
+    content-align: center middle;
+    margin: 0 0 1 0;
+}
+
+#current_song_subtitle {
+    height: 1;
+    color: $text-muted;
+    text-align: center;
+    content-align: center middle;
+    margin: 0 0 1 0;
+}
+
+#main_progress {
+    height: 1;
+    margin: 0 2 1 2;
+    background: $surface-darken-2;
+    border: round $accent;
+}
+
+.playing_info_row {
+    height: 2;
+    align: center middle;
+}
+
+.playing_info_row Static {
+    width: 1fr;
+    text-align: center;
+    content-align: center middle;
+    background: $surface-darken-2;
+    border: round $accent;
+    margin: 0 1;
+    color: $text;
+    text-style: bold;
+}
+
+/* 中间区域布局 */
+.middle_section {
+    height: 12;
+    margin: 0 0 1 0;
+}
+
+/* 频谱可视化区域 */
+.spectrum_section {
+    width: 3fr;
+    height: 12;
+    background: $surface-darken-1;
+    border: round $warning 60%;
+    border-title-color: $warning;
+    border-title-align: left;
+    border-title-style: bold;
+    padding: 1;
+    margin: 0 1 0 0;
+}
+
+.spectrum_container {
+    height: 1fr;
+    background: $surface-darken-2;
+    border: round $accent;
+    padding: 1;
+    font-family: monospace;
+    color: $primary;
+    text-align: center;
+    content-align: center middle;
+}
+
+/* 统计信息区域 */
+.stats_section {
+    width: 2fr;
+    height: 12;
+    background: $surface-darken-1;
+    border: round $primary 60%;
+    border-title-color: $primary;
+    border-title-align: left;
+    border-title-style: bold;
+    padding: 1;
+}
+
+.stats_cards {
+    height: 1fr;
+    align: center top;
+}
+
+.stats_cards Static {
+    height: 2;
+    width: 1fr;
+    background: $surface-darken-2;
+    border: round $accent;
+    margin: 0 0 1 0;
+    text-align: center;
+    content-align: center middle;
+    color: $text;
+    text-style: bold;
+}
+
+/* 底部区域布局 */
+.bottom_section {
+    height: 8;
+}
+
+/* 快速操作区域 */
+.quick_actions {
+    width: 3fr;
+    height: 8;
+    background: $surface-darken-1;
+    border: round $accent 60%;
+    border-title-color: $accent;
+    border-title-align: left;
+    border-title-style: bold;
+    padding: 1;
+    margin: 0 1 0 0;
+}
+
+.action_buttons {
+    height: 1fr;
+    align: center middle;
+    margin: 1 0 0 0;
+}
+
+.quick_btn {
+    margin: 0 1;
+    width: 12;
+    height: 3;
+    text-style: bold;
+    border: round $accent;
+    background: $surface;
+    color: $text;
+}
+
+.quick_btn:hover {
+    background: $surface-lighten-1;
+    border: round $accent 100%;
+}
+
+.quick_btn.primary {
+    background: $primary;
+    color: $background;
+    border: round $primary;
+}
+
+.quick_btn.primary:hover {
+    background: $primary-lighten-1;
+}
+
+/* 系统状态区域 */
+.system_status {
+    width: 2fr;
+    height: 8;
+    background: $surface-darken-1;
+    border: round $error 60%;
+    border-title-color: $error;
+    border-title-align: left;
+    border-title-style: bold;
+    padding: 1;
+}
+
+.status_items {
+    height: 1fr;
+    align: center top;
+    margin: 1 0 0 0;
+}
+
+.status_items Static {
+    height: 1;
+    width: 1fr;
+    color: $text;
+    margin: 0 0 1 0;
+}
+
+/* 通用部分标题 */
+.section_title {
+    height: 1;
+    text-style: bold;
+    color: $text-accent;
+    text-align: center;
+    content-align: center middle;
+    margin: 0 0 1 0;
+}
+
+/* 粒子背景容器 */
+.particle_background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    opacity: 0.3;
+}
+
+#particles_container {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+}
+
+/* Animal Well 主题化样式 */
+.visualizer_main.theme-cave {
+    background: $surface-darken-2;
+}
+
+.visualizer_main.theme-cave .current_playing_card {
+    border: round $primary 80%;
+    border-title-color: $primary;
+    background: linear-gradient(90deg, $surface-darken-1, $surface);
+}
+
+.visualizer_main.theme-neon {
+    background: $surface;
+}
+
+.visualizer_main.theme-neon .current_playing_card {
+    border: round $accent 100%;
+    border-title-color: $accent;
+    background: $surface-darken-1;
+}
+
+/* 动画效果 */
+@keyframes pulse-glow {
+    0% { 
+        border: round $success 70%;
+        background: $surface-darken-1;
+    }
+    50% { 
+        border: round $success 100%;
+        background: $surface;
+    }
+    100% { 
+        border: round $success 70%;
+        background: $surface-darken-1;
+    }
+}
+
+@keyframes spectrum-pulse {
+    0% { color: $primary; }
+    25% { color: $warning; }
+    50% { color: $success; }
+    75% { color: $error; }
+    100% { color: $primary; }
+}
+
+.current_playing_card.playing {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.spectrum_container.active {
+    animation: spectrum-pulse 1s ease-in-out infinite;
+}
+
+/* 频谱条样式 */
+.spectrum_container {
+    font-family: "Courier New", monospace;
+    letter-spacing: 1px;
+}
+
+/* 响应式设计 */
+@media (max-width: 120) {
+    .middle_section {
+        height: 16;
+    }
+    
+    .spectrum_section {
+        width: 1fr;
+        margin: 0 0 1 0;
+    }
+    
+    .stats_section {
+        width: 1fr;
+    }
+}
+
+/* 高亮状态 */
+.current_playing_card.highlight {
+    border: round $success 100%;
+    border-title-color: $success-lighten-1;
+}
+
+.spectrum_section.active {
+    border: round $warning 100%;
+    border-title-color: $warning-lighten-1;
+}
+
+.stats_section.updated {
+    border: round $primary 100%;
+    border-title-color: $primary-lighten-1;
+}

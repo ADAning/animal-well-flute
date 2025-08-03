@@ -9,6 +9,7 @@ from textual.binding import Binding
 from typing import Optional, List, Tuple
 from dataclasses import dataclass
 from rich.text import Text
+import time
 
 from ...services.song_service_base import SongServiceBase
 from ...data.songs.song_manager import SongManager
@@ -71,6 +72,11 @@ class SongBrowser(Container):
         self.song_manager = SongManager()
         self.all_songs: List[SongInfo] = []
         self.filtered_songs: List[SongInfo] = []
+        
+        # 双击检测变量
+        self._last_click_time = 0
+        self._last_clicked_row = -1
+        self._double_click_threshold = 0.5  # 500ms内的两次点击算作双击
 
     def compose(self) -> ComposeResult:
         """构建组件界面"""
@@ -165,7 +171,7 @@ class SongBrowser(Container):
                 status_msg = f"✅ 已加载 {len(self.all_songs)} 首歌曲"
                 if duplicate_keys:
                     status_msg += f" (包含 {len(set(duplicate_keys))} 个重复key)"
-                status_msg += " - 选择歌曲后按Enter播放或点击按钮操作"
+                status_msg += " - 选择歌曲后按Enter进入播放控制或点击按钮操作"
                 self._update_status(status_msg)
             else:
                 self._update_status("🔍 未找到歌曲文件 - 请检查 songs/ 目录")
@@ -329,12 +335,12 @@ class SongBrowser(Container):
 
     # 快捷键动作方法
     def action_play_selected(self) -> None:
-        """播放选中的歌曲 (Enter键)"""
+        """进入播放控制页面 (Enter键)"""
         selected = self._get_selected_song()
         if selected:
             song_name, song_key = selected
             self.post_message(self.PlayRequested(song_name, song_key))
-            self._update_status(f"正在播放: {song_name}")
+            self._update_status(f"进入播放控制: {song_name}")
         else:
             self._update_status("⚠️  请先在列表中选择一首歌曲")
 
@@ -362,9 +368,29 @@ class SongBrowser(Container):
         """处理表格行选择"""
         if event.row_key and len(self.filtered_songs) > event.cursor_row >= 0:
             song = self.filtered_songs[event.cursor_row]
-            self.selected_song = song.name
-            self.post_message(self.SongSelected(song.name, song.key))
-            self._update_status(f"已选择: {song.name} - 按Enter播放，空格分析，或点击操作按钮")
+            current_time = time.time()
+            current_row = event.cursor_row
+            
+            # 检测双击
+            is_double_click = (
+                current_row == self._last_clicked_row and 
+                current_time - self._last_click_time <= self._double_click_threshold
+            )
+            
+            # 更新双击检测变量
+            self._last_click_time = current_time
+            self._last_clicked_row = current_row
+            
+            # 处理双击事件
+            if is_double_click:
+                # 双击进入播放控制页面
+                self.post_message(self.PlayRequested(song.name, song.key))
+                self._update_status(f"双击进入播放控制: {song.name}")
+            else:
+                # 单击选择
+                self.selected_song = song.name
+                self.post_message(self.SongSelected(song.name, song.key))
+                self._update_status(f"已选择: {song.name} - 按Enter进入播放控制，空格分析，或双击进入播放控制")
     
 
     def _show_song_details(self, song_name: str, song_key: str) -> None:
