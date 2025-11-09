@@ -25,7 +25,12 @@ import glob
 
 
 def auto_play(
-    song_name, strategy_args=["optimal"], bpm=None, ready_time=None, interactive=False
+    song_name,
+    strategy_args=["optimal"],
+    bpm=None,
+    ready_time=None,
+    interactive=False,
+    quiet=False,
 ):
     """自动演奏功能"""
 
@@ -129,7 +134,7 @@ def auto_play(
     )
 
     # 准备演奏
-    flute = AutoFlute()
+    flute = AutoFlute(quiet=quiet)
     beat_interval = 60.0 / final_bpm
 
     # 检查无效音符
@@ -366,6 +371,11 @@ def main():
     play_parser.add_argument(
         "--interactive", "-i", action="store_true", help="使用交互式模式选择歌曲"
     )
+    play_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="安静模式（减少逐音打印，提升时序稳定）",
+    )
 
     # analyze 命令
     analyze_parser = subparsers.add_parser("analyze", help="分析乐曲")
@@ -410,7 +420,14 @@ def main():
     args = parser.parse_args()
 
     if args.command == "play":
-        auto_play(args.song, args.strategy, args.bpm, args.ready_time, args.interactive)
+        auto_play(
+            args.song,
+            args.strategy,
+            args.bpm,
+            args.ready_time,
+            args.interactive,
+            args.quiet,
+        )
     elif args.command == "analyze":
         analyze_song(args.song, args.interactive)
     elif args.command == "import":
