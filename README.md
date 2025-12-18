@@ -280,7 +280,7 @@ Songs are defined in `.yaml` files using a format based on **Jianpu**.
 
 The `jianpu` format uses numbers `1-7` to represent notes. Special characters and notations are used for rhythm, octaves, and rests:
 
-- **Octaves**: `h` for high (e.g., `h1`), `l` for low (e.g., `l6`).
+  - **Octaves**: `h`/`hh`/`hhh`... for higher octaves (e.g., `h1`, `hh1`), `l`/`ll`/`lll`... for lower octaves (e.g., `l6`, `ll6`).
 - **Rhythm**: Parentheses `()` are used for shorter notes, and `d` might indicate a dotted note (e.g., `5d`).
 - **Rests**: `0` represents a rest.
 

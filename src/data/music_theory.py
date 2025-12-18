@@ -1,5 +1,6 @@
 """音乐理论模块 - 处理相对音高和物理音高的映射"""
 
+import re
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
@@ -18,7 +19,7 @@ class MappingStrategy(Enum):
 class RelativeNote:
     """相对音高音符 - 简谱中的音符标记"""
 
-    notation: str  # 音符标记，如 "1", "h3", "l5"
+    notation: str  # 音符标记，如 "1", "h3", "hh2", "l5"
     relative_height: float  # 相对高度值
     time_factor: float  # 时值因子
 
@@ -100,6 +101,14 @@ class MusicNotation:
         "h17": 20,
     }
 
+    # 一个八度（高八度/低八度）的相对高度跨度。
+    # 该项目的相对高度以 0.5 为半音，因此从 1(0) 到 h1(6) 为 12 个半音。
+    OCTAVE_SPAN: float = RELATIVE_HEIGHTS["h1"] - RELATIVE_HEIGHTS["1"]
+
+    _OCTAVE_PREFIX_PATTERN = re.compile(
+        r"^(?P<prefix>h+|l+)(?P<body>\d+(?:\.\d+)?)$"
+    )
+
     @classmethod
     def initialize_half_tones(cls):
         """初始化半音音符"""
@@ -119,7 +128,27 @@ class MusicNotation:
     @classmethod
     def get_relative_height(cls, notation: str) -> Optional[float]:
         """获取音符的相对高度"""
-        return cls.RELATIVE_HEIGHTS.get(notation)
+        if notation in cls.RELATIVE_HEIGHTS:
+            return cls.RELATIVE_HEIGHTS.get(notation)
+
+        # 支持多八度前缀：hh1 / ll6 / hhh2.5 等
+        match = cls._OCTAVE_PREFIX_PATTERN.match(notation)
+        if not match:
+            return None
+
+        prefix = match.group("prefix")
+        body = match.group("body")
+
+        base_height = cls.RELATIVE_HEIGHTS.get(body)
+        if base_height is None:
+            # 休止符（0）或未知音符
+            return None
+
+        octave_shift = cls.OCTAVE_SPAN * len(prefix)
+        if prefix[0] == "l":
+            octave_shift = -octave_shift
+
+        return base_height + octave_shift
 
     @classmethod
     def extend_range(cls, target_range: float):

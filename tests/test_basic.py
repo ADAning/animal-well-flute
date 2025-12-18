@@ -3,7 +3,7 @@
 import pytest
 from src.core.parser import RelativeParser
 from src.core.converter import AutoConverter
-from src.data.music_theory import RelativeNote, PhysicalNote
+from src.data.music_theory import MusicNotation, RelativeNote, PhysicalNote
 from src.data.songs.sample_songs import get_sample_songs
 
 
@@ -75,22 +75,22 @@ def test_sample_songs():
 
 def test_parser_with_rest():
     """测试解析器处理休止符"""
-    parser = Parser()
+    parser = RelativeParser()
     jianpu = [[1, 0, 2, "-"]]
 
     result = parser.parse(jianpu)
     assert len(result) == 1
     assert len(result[0]) == 3  # 延长音会合并到前一个音符
 
-    assert result[0][0].note == "1"
-    assert result[0][1].note == "0"
-    assert result[0][2].note == "2"
-    assert result[0][2].time_factor == 4.0  # 2.0 + 2.0 (延长音)
+    assert result[0][0].notation == "1"
+    assert result[0][1].notation == "0"
+    assert result[0][2].notation == "2"
+    assert result[0][2].time_factor == 2.0  # 1.0 + 1.0 (延长音)
 
 
 def test_parser_with_dotted_notes():
     """测试解析器处理附点音符"""
-    parser = Parser()
+    parser = RelativeParser()
     jianpu = [["1d", "2d"]]
 
     result = parser.parse(jianpu)
@@ -98,9 +98,26 @@ def test_parser_with_dotted_notes():
     assert len(result[0]) == 2
 
     # 附点音符时值应该是1.5倍
-    assert result[0][0].time_factor == 3.0  # 2.0 * 1.5
-    assert result[0][1].time_factor == 3.0  # 2.0 * 1.5
+    assert result[0][0].time_factor == pytest.approx(1.5)  # 1.0 * 1.5
+    assert result[0][1].time_factor == pytest.approx(1.5)  # 1.0 * 1.5
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+def test_music_notation_multi_octave_prefix():
+    octave = MusicNotation.OCTAVE_SPAN
+    assert MusicNotation.get_relative_height("hh1") == pytest.approx(
+        MusicNotation.get_relative_height("h1") + octave
+    )
+    assert MusicNotation.get_relative_height("ll6") == pytest.approx(
+        MusicNotation.get_relative_height("l6") - octave
+    )
+
+
+def test_parser_supports_hh_notes():
+    parser = RelativeParser()
+    jianpu = [["hh1", "hh2", "hh2.5"]]
+
+    result = parser.parse(jianpu)
+    assert [n.notation for n in result[0]] == ["hh1", "hh2", "hh2.5"]
+    assert result[0][0].relative_height == MusicNotation.get_relative_height("hh1")
+    assert result[0][1].relative_height == MusicNotation.get_relative_height("hh2")
+    assert result[0][2].relative_height == MusicNotation.get_relative_height("hh2.5")
