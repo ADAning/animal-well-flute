@@ -1,0 +1,19 @@
+name: Where Wind Whispers
+bpm: 102
+jianpu:
+  - h6 | hh1 (hh1 h7) ((h6 (h7 h6)) h5) | h3 (h2 h3) h1 | h2 h1 (7 5) 
+  - 3 - (6 7) | h1d (6) h1 | h2 7 5 | 6 - h2 
+  - h3 - (h6 h7) | hh1d (h7) ((h6 (h7 h6)) h5) | h3 (h2 h3) h1 | h2 h1 h5
+  - h3 - (6 7) | h1d (6) h1 | h2 7d (5) | 6 - - 
+  - 0 0 0 | 0 0 0 | 0 0 0 | 0 0 0 
+  - hh1d (h7) ((h6 (h7 h6)) h5) | h3 (h2 h3) h1 | h2 h1 (7 5) | 3 - (6 7)
+  - h1d (6) h1 | h2 7 5 | 6 - (h2 h1) | h3 - (h6 h7)
+  - hh1d (h7) ((h6 (h7 h6)) h5) | h3 (h2 h3) h1 | h2 h1 h5 | h6 - 0
+  - 0 0 6 | h3 - (h2 h1) | 7 5d (3) | 6 - - 
+  - 6 - 0 | (hh1 h7) h6d (h7) | (h6 h5) h3 h2 | h2 h3 -
+  - h3 - - | h1 h2 - | (h1 h2) h3 h5 | (hh1 h7) h6 -
+  - h6 - - | h6 - 0 | 0 0 0 | (h6 h7) hh1d (h7)
+  - (h6 h5) h3 - | h1 h2 h1 | 7 6 - | 6 h3d (h2) | 
+  - (h1 h5) 7 5 | (5 7) 6 - | 6 - 
+
+description: "Wuthering Waves: Where Wind Whispers (故风吟游之地, 拂风水畔BGM)"
